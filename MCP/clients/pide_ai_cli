@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+#
+# Author: Kevin Kappelmann
+#
+# Client for Isabelle PIDE AI servers.
+
+PRG="$(basename "$0")"
+
+function usage()
+{
+  echo "Usage: $PRG PORT TOOL [JSON]" >&2
+  exit 2
+}
+
+[ "$#" -ge 2 -a "$#" -le 3 ] || usage
+
+PORT="$1"
+TOOL="$2"
+JSON="${3:-"{}"}"
+JSON="${JSON//$'\r'/}"
+JSON="${JSON//$'\n'/ }"
+
+exec 3<>"/dev/tcp/127.0.0.1/$PORT" || exit 2
+printf 'cmd\n%s %s\n' "$TOOL" "$JSON" >&3
+IFS= read -r FIRST <&3
+if [ "$FIRST" != OK ]; then
+  [ -z "$FIRST" ] || printf '%s\n' "$FIRST"
+  exit 1
+fi
+RC=1
+while IFS= read -r LINE <&3 || [ -n "$LINE" ]; do
+  printf '%s\n' "$LINE"
+  case "$LINE" in '{"result":'*) RC=0 ;; esac
+done
+exit "$RC"

@@ -20,15 +20,16 @@ class Queue_Lock {
     progress_delay: Time
   )(body: => A): A = {
     val thread = Thread.currentThread().nn
-    def ahead: Int = queue.value.indexOf(thread)
-    def holding: Boolean = ahead == 0
-    if (holding) body
+    def ahead(threads: List[Thread]): Int = threads.indexOf(thread)
+    def holding(threads: List[Thread]): Boolean = ahead(threads) == 0
+    if (holding(queue.value)) body
     else {
       queue.change(_ ::: List(thread))
       try {
-        PIDE_MCP_Progress.await(progress,
-          message + if_proper(ahead > 0, s" ($ahead ahead in queue)"),
-          delay, progress_delay)(Option.when(holding)(()))
+        Progress_Await.await_guarded(queue, progress, {
+            val n = ahead(queue.value)
+            message + if_proper(n > 0, s" ($n ahead in queue)")
+          }, delay, progress_delay)(threads => Option.when(holding(threads))(()))
         body
       } finally queue.change(_.filterNot(_ == thread))
     }

@@ -174,11 +174,22 @@ on the same files at the same time (cf. screenshot above),
 keeping the synchronization caveats from the [usage notes](#usage-notes) section in mind.
 Check out the [quick start tutorial](https://formalproof.ai/quick-start/) to learn how to write your first agentic proof.
 
+## Command-based Interaction
+
+PIDE AI also offers command-based interactions, e.g. via CLI:
+```bash
+# start a server, it reports its PORT
+isabelle/bin/isabelle pide_ai
+# then, in another shell
+MCP/clients/pide_ai_cli PORT list_extensions '{"include_input_schema": true}'
+```
+**Warning:** any local user can connect to the port - there is no authentication!
+
 ## Customisation
 
 The server is extensible by services and tools:
 - Services run in the background and only have start and stop hooks.
-- Tools are services that are offered via MCP, additionally implementing a `handle` for tool calls.
+- Tools are services offered to clients, additionally implementing a `handle` for tool calls.
 
 Both are registered in the `services` field in `build.props` and selected at startup using the Isabelle options `pide_mcp_services_include`, `pide_mcp_services_exclude`, `pide_mcp_tools_include`, and `pide_mcp_tools_exclude` (see [`MCP/etc/options`](./MCP/etc/options)).
 - Disable them at compilation time by removing them from `services` in `build.props` or exclude them at startup using the options.

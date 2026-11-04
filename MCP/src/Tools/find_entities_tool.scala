@@ -1,4 +1,4 @@
-/*  Title:      MCP/src/Tools/tool_find_entities.scala
+/*  Title:      MCP/src/Tools/find_entities_tool.scala
     Author:     Kevin Kappelmann
 */
 
@@ -6,7 +6,7 @@ package isabelle.pide.mcp
 
 import isabelle._
 
-object Tool_Find_Entities {
+object Find_Entities_Tool {
   enum Kind(val markups: List[String], val hint: String = "") {
     case facts extends Kind(
       List(Markup.FACT, Markup.DYNAMIC_FACT, Markup.LITERAL_FACT, Markup.AXIOM))
@@ -30,26 +30,26 @@ object Tool_Find_Entities {
   }
 }
 
-class Tool_Find_Entities extends PIDE_MCP_Tool("find_entities") {
+class Find_Entities_Tool extends PIDE_MCP_Tool("find_entities") {
   def description: String =
     "Find definition locations for entities (theorems, commands,...). " +
     PIDE_MCP_Tool_Schema.implicit_load_file
 
-  private val snippet_lines_arg = JSON_Schema.Arg.default(
+  val snippet_lines_arg = JSON_Schema.Arg.default(
     "snippet_lines", "Number of source lines shown per hit (0 to omit).",
     JSON_Schema.Format.int(minimum = Some(0)), 3)
-  private val filter_origins_arg = JSON_Schema.Arg.optional(
+  val filter_origins_arg = JSON_Schema.Arg.optional(
     "filter_origins",
     "Return entities defined in one of these origins. Default: all.",
     JSON_Schema.Format.list(JSON_Schema.Format.string))
-  private val kinds_arg = JSON_Schema.Arg.default(
+  val kinds_arg = JSON_Schema.Arg.default(
     "kinds", "Kinds to return. " +
-    Tool_Find_Entities.Kind.values.filter(_.hint.nonEmpty)
+    Find_Entities_Tool.Kind.values.filter(_.hint.nonEmpty)
       .map(kind => kind.name + " = " + kind.hint).mkString("; ") + ".",
     JSON_Schema.Format.list(
-      JSON_Schema.Format.enumeration(Tool_Find_Entities.Kind.values, _.name)),
-    List(Tool_Find_Entities.Kind.facts, Tool_Find_Entities.Kind.constant,
-      Tool_Find_Entities.Kind.type_name, Tool_Find_Entities.Kind.`class`))
+      JSON_Schema.Format.enumeration(Find_Entities_Tool.Kind.values, _.name)),
+    List(Find_Entities_Tool.Kind.facts, Find_Entities_Tool.Kind.constant,
+      Find_Entities_Tool.Kind.type_name, Find_Entities_Tool.Kind.`class`))
 
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(
     List(PIDE_MCP_Tool_Schema.running_session_arg, PIDE_MCP_Tool_Schema.origin_arg,
@@ -59,15 +59,14 @@ class Tool_Find_Entities extends PIDE_MCP_Tool("find_entities") {
   override def annotations: Option[JSON.Object.T] = Some(JSON_Object("readOnlyHint" -> true))
 
   def handle(
-    sessions: PIDE_MCP_Sessions,
+    server: PIDE_AI_Server,
     args: JSON.Object.T,
     progress: Progress
   ): PIDE_MCP_Tool_Result =
     PIDE_MCP_Tool_Result.result {
-      val session = PIDE_MCP_Tool_Util.running_session_param(sessions, args)
+      val session = PIDE_MCP_Tool_Util.running_session_param(server.sessions, args)
       val node_name = PIDE_MCP_Tool_Util.origin_param(session, args)
-      session.await_stable(session.sync_dependencies_resolve(List(node_name), progress), progress)
-      val snapshot = PIDE_MCP_Tool_Util.require_loaded_origin_snapshot(session, node_name, progress)
+      val snapshot = PIDE_MCP_Tool_Util.require_stable_origin_snapshot(session, node_name, progress)
       val snippet_lines = snippet_lines_arg.get(args)
       val filter_origins = filter_origins_arg.get(args)
         .map(_.map(origin => session.origin(session.node_name(origin))).toSet)
@@ -83,4 +82,4 @@ class Tool_Find_Entities extends PIDE_MCP_Tool("find_entities") {
     }
 }
 
-class Tools_Find_Entities extends PIDE_MCP_Tools(new Tool_Find_Entities)
+class Find_Entities_Tools extends PIDE_MCP_Tools(new Find_Entities_Tool)

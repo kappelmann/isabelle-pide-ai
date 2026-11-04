@@ -18,17 +18,3 @@ enum Result[+A, +E] {
       case Error(error) => Error(error)
     }
 }
-
-object Result {
-  def result[A](body: => A): Result[A, Throwable] =
-    Exn.result(body) match {
-      case Exn.Res(value) => Res(value)
-      case Exn.Exn(exn) => Error(exn)
-    }
-
-  def release[A](result: Result[A, Throwable]): A =
-    result match {
-      case Res(value) => value
-      case Error(exn) => throw exn
-    }
-}

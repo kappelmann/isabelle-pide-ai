@@ -11,6 +11,13 @@ import scala.annotation.tailrec
 import scala.collection.immutable.Queue
 
 object PIDE_MCP_Session {
+  def progress_delay(options: Options): Time = options.seconds("pide_mcp_session_progress_delay")
+  def poll_delay(options: Options): Time = options.seconds("pide_mcp_poll_delay")
+  def range_context(options: Options): Int = options.int("pide_mcp_range_context")
+  def statistics_limit(options: Options): Int = options.int("pide_mcp_session_statistics_limit")
+  def unicode_symbols_disk(options: Options): Boolean =
+    options.bool("pide_mcp_unicode_symbols_disk")
+
   def build(
     spec: PIDE_MCP_Session_Spec,
     progress: Progress
@@ -35,35 +42,30 @@ object PIDE_MCP_Session {
     session_background: Sessions.Background,
     log: Logger,
     progress: Progress
-  ): Result[PIDE_MCP_Session, Throwable] =
-    Exn.result {
-      val id = spec.id.getOrElse(error("Missing session id"))
-      val resources = Headless.Resources(options, session_background, log)
+  ): PIDE_MCP_Session = {
+    val id = spec.id.getOrElse(error("Missing session id"))
+    val resources = Headless.Resources(options, session_background, log)
+    progress.expose_interrupt()
+    val session = resources.start_session(progress = progress)
+    try {
       progress.expose_interrupt()
-      val session = resources.start_session(progress = progress)
-      id -> session
-    } match {
-      case Exn.Exn(exn) => Result.Error(exn)
-      case Exn.Res((id, session)) =>
-        Exn.capture {
-          progress.expose_interrupt()
-          new PIDE_MCP_Session(id = id, dirs = spec.dirs, session = session)
-        } match {
-          case Exn.Res(session) => Result.Res(session)
-          case Exn.Exn(exn) =>
-            val stop_failure = Exn.capture(session.stop()) match {
-              case Exn.Res(process_result) =>
-                Option.when(!process_result.ok)(PIDE_MCP_Util.print_process_result(process_result))
-              case Exn.Exn(stop_exn) => Some(Exn.message(stop_exn))
-            }
-            stop_failure match {
-              case None => if (Exn.is_interrupt(exn)) throw exn else Result.Error(exn)
-              case Some(message) => throw ERROR(cat_lines(List(
-                Exn.message(exn),
-                s"Failed to stop partially started PIDE session ${quote(id)}: " + message)))
-            }
+      new PIDE_MCP_Session(id = id, dirs = spec.dirs, session = session)
+    }
+    catch {
+      case exn: Throwable =>
+        val stop_failure = Exn.capture(session.stop()) match {
+          case Exn.Res(process_result) =>
+            Option.when(!process_result.ok)(PIDE_MCP_Util.print_process_result(process_result))
+          case Exn.Exn(stop_exn) => Some(Exn.message(stop_exn))
+        }
+        stop_failure match {
+          case None => throw exn
+          case Some(message) => throw ERROR(cat_lines(List(
+            Exn.message(exn),
+            s"Failed to stop partially started PIDE session ${quote(id)}: " + message)))
         }
     }
+  }
 }
 
 class PIDE_MCP_Session private(
@@ -73,13 +75,10 @@ class PIDE_MCP_Session private(
 ) {
   def resources: Headless.Resources = session.resources
   def options: Options = resources.options
-  def progress_delay: Time = options.seconds("pide_mcp_session_progress_delay")
-  def poll_delay: Time = options.seconds("pide_mcp_poll_delay")
-  def range_context: Int = options.int("pide_mcp_range_context")
-  def statistics_limit: Int = options.int("pide_mcp_session_statistics_limit")
-  def unicode_symbols_disk: Boolean = options.bool("pide_mcp_unicode_symbols_disk")
   def disk_text(path: Path, text: String): String =
-    if (Symbols.supports_isabelle_symbols(path)) Symbol.output(unicode_symbols_disk, text)
+    if (Symbols.supports_isabelle_symbols(path)) {
+      Symbol.output(PIDE_MCP_Session.unicode_symbols_disk(options), text)
+    }
     else text
   def pide_text(path: Path, text: String): String =
     if (Symbols.supports_isabelle_symbols(path)) Symbol.decode(text) else text
@@ -92,14 +91,18 @@ class PIDE_MCP_Session private(
 
   private val lock = new Queue_Lock
   def with_lock[A](progress: Progress)(body: => A): A =
-    lock.with_lock(progress, await_message("session lock"), poll_delay, progress_delay)(body)
+    lock.with_lock(progress, await_message("session lock"), PIDE_MCP_Session.poll_delay(options),
+      PIDE_MCP_Session.progress_delay(options))(body)
 
   private val statistics = Synchronized[Queue[Properties.T]](Queue.empty)
   private val statistics_consumer = Session.Consumer[Session.Runtime_Statistics](this.class_name) {
     case Session.Runtime_Statistics(props) =>
       statistics.change { statistics =>
         val statistics1 = statistics.appended(props)
-        if (statistics1.length > statistics_limit) statistics1.dequeue._2 else statistics1
+        if (statistics1.length > PIDE_MCP_Session.statistics_limit(options)) {
+          statistics1.dequeue._2
+        }
+        else statistics1
       }
   }
   session.runtime_statistics += statistics_consumer
@@ -118,9 +121,9 @@ class PIDE_MCP_Session private(
   def stop(): Process_Result = {
     session.runtime_statistics -= statistics_consumer
     session.syslog_messages -= syslog_consumer
-    val result = session.stop()
-    overlay_updates.shutdown()
-    result
+    val result = Exn.capture { session.stop() }
+    PIDE_MCP_Util.release_combined(List(result, Exn.capture { overlay_updates.shutdown() }))
+    Exn.release(result)
   }
 
   private def path_node_name(path: Path): Document.Node.Name = {
@@ -160,9 +163,10 @@ class PIDE_MCP_Session private(
   def await_while_ready[A](
     progress: Progress,
     what: => String,
-    delay: Time = poll_delay
+    delay: Time = PIDE_MCP_Session.poll_delay(options)
   )(value: => Option[A]): A =
-    PIDE_MCP_Progress.await(progress, await_message(what), delay, progress_delay) {
+    Progress_Await.await_delay(progress, await_message(what), delay,
+      PIDE_MCP_Session.progress_delay(options)) {
       require_ready()
       value
     }
@@ -275,14 +279,13 @@ class PIDE_MCP_Session private(
   def read_update(
     nodes: List[(Document.Node.Name, Option[List[(Int, Option[Int])]])],
     hide_others: Boolean,
-    range_context: Int = range_context,
     progress: Progress
   ): (Map[Document.Node.Name, String], Document.Change) = {
     val (models, change) = with_lock(progress) {
       val version = tip_version(progress)
       val models1 = nodes.map { case (name, visible_lines) =>
         PIDE_MCP_Document_Model.make(session, name, version.nodes(name), read_file_content(name),
-          visible_lines, range_context)
+          visible_lines, PIDE_MCP_Session.range_context(options))
       }
       val other_edits = if (!hide_others) Iterator.empty
         else PIDE_MCP_Document_Model.hide_edits(version.nodes, nodes.map(_._1).toSet)
@@ -320,13 +323,12 @@ class PIDE_MCP_Session private(
     visible_lines: List[(Int, Option[Int])],
     await_stable_before_resolve: Boolean,
     hide_others: Boolean,
-    range_context: Int = range_context,
     progress: Progress
   ): String = {
     if (is_base_session_theory(node_name)) node_snapshot(node_name).node.source
     else {
-      val (texts, change) = read_update(List(node_name -> Some(visible_lines)), hide_others,
-        range_context, progress)
+      val (texts, change) =
+        read_update(List(node_name -> Some(visible_lines)), hide_others, progress)
       if (await_stable_before_resolve) await_stable(change, progress)
       resolve_dependencies(List(node_name), progress)
       texts(node_name)

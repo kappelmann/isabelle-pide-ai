@@ -82,7 +82,7 @@ sealed case class PIDE_MCP_Document_Model(
   pending_edits: List[Text.Edit],
   text_perspective: Text.Perspective
 ) extends Document.Model {
-  def node_required: Boolean = text.nonEmpty
+  def node_required: Boolean = true
   def untyped_data: AnyRef = File_Format.registry.parse_data(node_name, text)
 
   def is_stable: Boolean = pending_edits.isEmpty

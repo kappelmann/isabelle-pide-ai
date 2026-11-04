@@ -1,5 +1,7 @@
 /*  Title:      MCP/src/pide_mcp_file_watcher.scala
     Author:     Kevin Kappelmann
+
+File watcher (NB. Isabelle's file watcher for MacOS has no configurable polling interval).
 */
 
 package isabelle.pide.mcp

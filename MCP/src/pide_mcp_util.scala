@@ -9,23 +9,30 @@ package isabelle.pide.mcp
 import isabelle._
 
 object PIDE_MCP_Util {
-  def capture_failures[A](args: IterableOnce[A], run: A => Unit): Iterator[(A, Throwable)] =
-    args.iterator.flatMap(arg =>
-      Exn.capture(run(arg)) match {
-        case Exn.Res(_) => None
-        case Exn.Exn(exn) => Some((arg, exn))
-      })
+  def log_failure(log: Logger, what: String, result: Exn.Result[?]): Unit =
+    result match {
+      case Exn.Exn(exn) => Exn.capture { log.error_message(s"$what: ${Exn.print(exn)}") }
+      case Exn.Res(_) =>
+    }
 
-  // like Exn.release_first, but reports every error instead of only the first one
-  def failure(exn: Throwable, more: List[Throwable]): Throwable =
+  def handle_internal_error(log: Logger, what: String, exn: Throwable): String = {
+    log_failure(log, "Internal error for " + what, Exn.Exn(exn))
+    "Internal error: " + Exn.message(exn)
+  }
+
+  def combined_failure(exn: Throwable, more: List[Throwable]): Throwable =
     (exn :: more).filterNot(Exn.is_interrupt) match {
       case Nil => exn
       case List(exn1) => exn1
       case failures => ERROR(cat_lines(failures.map(Exn.message)))
     }
 
-  def check_failures(exns: List[Throwable]): Unit =
-    for (exn <- exns.headOption) throw failure(exn, exns.tail)
+  // like Exn.release_first, but reports every error instead of only the first one
+  def release_combined(results: List[Exn.Result[?]]): Unit =
+    results.collect { case Exn.Exn(exn) => exn } match {
+      case exn :: more => throw combined_failure(exn, more)
+      case Nil =>
+    }
 
   def text_range(doc: Line.Document, start_line: Int, end_line: Int): Option[Text.Range] =
     if (start_line - 1 > end_line) None
@@ -63,6 +70,9 @@ object PIDE_MCP_Util {
 
   def line_range(start_line: Int, end_line: Int): String =
     if (start_line == end_line) start_line.toString else s"$start_line-$end_line"
+
+  def line_ranges_span(line_ranges: List[(Int, Int)]): Option[(Int, Int)] =
+    Option.when(line_ranges.nonEmpty)((line_ranges.head._1, line_ranges.last._2))
 
   def numbered_lines(lines: IterableOnce[String], start_line: Int): String =
     lines.iterator.zipWithIndex.map { case (l, i) =>

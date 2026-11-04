@@ -12,13 +12,40 @@ sources = \
   src/json_object.scala \
   src/json_schema.scala \
   src/json_rpc.scala \
+  src/mcp.scala \
   src/pide_mcp_protocol.scala \
   src/pide_mcp_definition.scala \
   src/result.scala \
   src/queue_lock.scala \
-  src/pide_mcp_progress.scala \
+  src/progress.scala \
+  src/task.scala \
+  src/lifecycle_hooks.scala \
+  src/task_scope.scala \
   src/progress_task.scala \
-  src/pide_mcp_server.scala \
+  src/pide_mcp_endpoint.scala \
+  src/pide_ai_proxy.scala \
+  src/pide_mcp_proxy_client_info.scala \
+  src/line_connection.scala \
+  src/pide_ai_registry.scala \
+  src/pide_ai_protocol.scala \
+  src/pide_ai_endpoint.scala \
+  src/pide_ai_tool_endpoint.scala \
+  src/pide_ai_startup_sessions.scala \
+  src/pide_ai_server.scala \
+  src/pide_ai_client_info.scala \
+  src/pide_ai_client_handler.scala \
+  src/pide_ai_connector.scala \
+  src/pide_ai_stdio_connector.scala \
+  src/pide_ai_protocol_handshake.scala \
+  src/pide_ai_tcp_connector.scala \
+  src/pide_ai_client_connector.scala \
+  src/pide_ai_tcp_client_connector.scala \
+  src/pide_ai_tool_call.scala \
+  src/pide_ai_command.scala \
+  src/pide_ai_command_protocol.scala \
+  src/pide_ai_command_client.scala \
+  src/pide_ai_command_cli_client_info.scala \
+  src/pide_ai_command_endpoint.scala \
   src/pide_mcp_session.scala \
   src/pide_mcp_session_spec.scala \
   src/pide_mcp_dependencies.scala \
@@ -32,36 +59,40 @@ sources = \
   src/pide_mcp_tool_util.scala \
   src/pide_mcp_theory.scala \
   src/pide_mcp_util.scala \
-  src/pide_mcp_edit.scala \
   src/pide_mcp_session_state.scala \
   src/pide_mcp_file_watcher.scala \
-  src/Services/service_file_watcher.scala \
-  src/Tools/tool_create_file.scala \
-  src/Tools/tool_create_scratch.scala \
-  src/Tools/tool_edit.scala \
-  src/Tools/tool_edit_get_state.scala \
-  src/Tools/tool_find_entities.scala \
-  src/Tools/tool_get_session_state.scala \
-  src/Tools/tool_get_state.scala \
-  src/Tools/tool_list_extensions.scala \
-  src/Tools/tool_list_sessions.scala \
-  src/Tools/tool_read.scala \
-  src/Tools/tool_start_session.scala \
-  src/Tools/tool_stop_session.scala \
-  src/Tools/tool_unload.scala
+  src/Services/file_watcher_service.scala \
+  src/Tools/create_file_tool.scala \
+  src/Tools/create_scratch_tool.scala \
+  src/Tools/edit_tool.scala \
+  src/Tools/edit_get_state_tool.scala \
+  src/Tools/find_entities_tool.scala \
+  src/Tools/get_session_state_tool.scala \
+  src/Tools/get_state_tool.scala \
+  src/Tools/list_extensions_tool.scala \
+  src/Tools/list_sessions_tool.scala \
+  src/Tools/read_tool.scala \
+  src/Tools/start_session_tool.scala \
+  src/Tools/stop_server_tool.scala \
+  src/Tools/stop_session_tool.scala \
+  src/Tools/unload_tool.scala
 services = \
   isabelle.pide.mcp.PIDE_MCP_Application \
-  isabelle.pide.mcp.Services_File_Watcher \
-  isabelle.pide.mcp.Tools_Create_File \
-  isabelle.pide.mcp.Tools_Create_Scratch \
-  isabelle.pide.mcp.Tools_Edit \
-  isabelle.pide.mcp.Tools_Edit_Get_State \
-  isabelle.pide.mcp.Tools_Find_Entities \
-  isabelle.pide.mcp.Tools_Get_Session_State \
-  isabelle.pide.mcp.Tools_Get_State \
-  isabelle.pide.mcp.Tools_List_Extensions \
-  isabelle.pide.mcp.Tools_List_Sessions \
-  isabelle.pide.mcp.Tools_Read \
-  isabelle.pide.mcp.Tools_Start_Session \
-  isabelle.pide.mcp.Tools_Stop_Session \
-  isabelle.pide.mcp.Tools_Unload
+  isabelle.pide.mcp.Command_Client_Infos \
+  isabelle.pide.mcp.Command_Protocols \
+  isabelle.pide.mcp.Create_File_Tools \
+  isabelle.pide.mcp.Create_Scratch_Tools \
+  isabelle.pide.mcp.Edit_Get_State_Tools \
+  isabelle.pide.mcp.Edit_Tools \
+  isabelle.pide.mcp.File_Watcher_Services \
+  isabelle.pide.mcp.Find_Entities_Tools \
+  isabelle.pide.mcp.Get_Session_State_Tools \
+  isabelle.pide.mcp.Get_State_Tools \
+  isabelle.pide.mcp.List_Extensions_Tools \
+  isabelle.pide.mcp.List_Sessions_Tools \
+  isabelle.pide.mcp.MCP_Protocols \
+  isabelle.pide.mcp.MCP_Proxy_Client_Infos \
+  isabelle.pide.mcp.Read_Tools \
+  isabelle.pide.mcp.Start_Session_Tools \
+  isabelle.pide.mcp.Stop_Session_Tools \
+  isabelle.pide.mcp.Unload_Tools

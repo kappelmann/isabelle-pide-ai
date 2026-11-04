@@ -41,12 +41,9 @@ object PIDE_MCP_Theory {
         Status(session.origin(name), nodes_status(name), nodes_status.overall_status(name)))
     }
 
-    def key(status: String): String = "thys_" + status
-
-    def prefix_keys(obj: JSON.Object.T): JSON.Object.T = {
-      val keys = Document_Status.Overall_Status.values.map(_.toString).toSet
-      obj.map { case (k, v) => if (keys.contains(k)) (key(k), v) else (k, v) }
-    }
+    val status_keys = Document_Status.Overall_Status.values.map(_.toString).toSet
+    def prefix_keys(obj: JSON.Object.T): JSON.Object.T =
+      JSON_Object.prefix_keys("thys_", status_keys)(obj)
 
     def statuses_json(statuses: List[Status]): JSON.Object.T = {
       val by_status = statuses.groupMapReduce(_.overall_status)(_ => 1)(_ + _)

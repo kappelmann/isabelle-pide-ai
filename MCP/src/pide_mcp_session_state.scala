@@ -7,39 +7,41 @@ package isabelle.pide.mcp
 import isabelle._
 
 object PIDE_MCP_Session_State {
-  enum List_Options { case `false`, `true`, changed }
+  object Include {
+    enum Options { case `false`, `true`, changed }
 
-  object List_Options {
-    private val strings = JSON_Schema.Format.enumeration(values)
-    val format: JSON_Schema.Format[List_Options] = JSON_Schema.Format(
-      JSON_Object("type" -> List("string", "boolean"),
-        "enum" -> (List[JSON.T](false, true) ::: values.map(strings(_)).toList)),
-      {
-        case JSON.Value.Boolean(mode) => Some(if (mode) `true` else `false`)
-        case json => strings.unapply(json)
-      },
-      {
-        case `false` => false
-        case `true` => true
-        case mode => strings(mode)
-      })
+    object Options {
+      private val strings = JSON_Schema.Format.enumeration(values)
+      val format: JSON_Schema.Format[Options] = JSON_Schema.Format(
+        JSON_Object("type" -> List("string", "boolean"),
+          "enum" -> (List[JSON.T](false, true) ::: values.map(strings(_)).toList)),
+        {
+          case JSON.Value.Boolean(mode) => Some(if (mode) `true` else `false`)
+          case json => strings.unapply(json)
+        },
+        {
+          case `false` => false
+          case `true` => true
+          case mode => strings(mode)
+        })
+    }
   }
 
-  sealed case class Args(
-    include_cmds_processing: Boolean,
-    include_thy_status: Boolean,
-    list_loaded_thys: Boolean,
-    list_session_dirs: Boolean,
-    list_options: List_Options,
-    include_statistics: Boolean)
+  sealed case class Include(
+    cmds_processing: Boolean,
+    thy_status: Boolean,
+    loaded_thys: Boolean,
+    session_dirs: Boolean,
+    options: Include.Options,
+    statistics: Boolean)
 
-  def options_json(mode: List_Options, options: Options): JSON.Object.T = {
+  def options_json(mode: Include.Options, options: Options): JSON.Object.T = {
     def json(entries: Iterator[Options.Entry]): JSON.Object.T =
       JSON_Object("options" -> JSON_Object(entries.map(entry => entry.name -> entry.value)))
     mode match {
-      case List_Options.`false` => JSON.Object.empty
-      case List_Options.`true` => json(options.iterator)
-      case List_Options.changed =>
+      case Include.Options.`false` => JSON.Object.empty
+      case Include.Options.`true` => json(options.iterator)
+      case Include.Options.changed =>
         json(options.iterator.filter(entry => entry.value != entry.default_value))
     }
   }
@@ -114,7 +116,7 @@ object PIDE_MCP_Session_State {
   def json(
     session: PIDE_MCP_Session,
     origins: Option[List[String]],
-    args: Args
+    include: Include
   ): JSON.Object.T = {
     lazy val snapshot = session.snapshot()
     lazy val theories = PIDE_MCP_Theory.Loaded(session, snapshot.version.nodes)
@@ -126,17 +128,17 @@ object PIDE_MCP_Session_State {
     }
     JSON_Object("session" -> session.id, "base_session" -> session.base_session) ++
     JSON.optional(PIDE_MCP_Command.Status.key(PIDE_MCP_Command.Status.running.name) ->
-      Option.when(args.include_cmds_processing) {
+      Option.when(include.cmds_processing) {
         PIDE_MCP_Theory.commands_running_json(session, snapshot, names)
       }.filter(_.nonEmpty)) ++
-    JSON_Object.if_proper(args.include_thy_status,
+    JSON_Object.if_proper(include.thy_status,
       PIDE_MCP_Theory.Status.statuses_json(
         PIDE_MCP_Theory.Status.statuses(session, snapshot, names))) ++
-    JSON.optional("loaded_thys" -> Option.when(args.list_loaded_thys)(theories.json)) ++
+    JSON.optional("loaded_thys" -> Option.when(include.loaded_thys)(theories.json)) ++
     JSON.optional("session_dirs" ->
-      Option.when(args.list_session_dirs)(session.directories().map(_.implode))) ++
-    options_json(args.list_options, session.options) ++
-    JSON_Object.if_proper(args.include_statistics, {
+      Option.when(include.session_dirs)(session.directories().map(_.implode))) ++
+    options_json(include.options, session.options) ++
+    JSON_Object.if_proper(include.statistics, {
       val statistics = session.runtime_statistics()
       if (statistics.isEmpty) JSON_Object("note" -> "no ML statistics reported yet")
       else ml_stats_json(statistics)

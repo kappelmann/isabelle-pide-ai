@@ -4,11 +4,14 @@ description: Using the Isabelle proof assistant with PIDE MCP. Use this whenever
 ---
 
 PIDE MCP's tools and services (extensions) are customisable. Some named below may be unavailable. Also load skills of extensions.
+Call tools via MCP or CLI `pide_ai_cli PORT TOOL 'JSON'`. `list_extensions '{"include_input_schema":true}'` lists tools.
+Unlike MCP, CLI shows progress and you can filter output as you like (e.g. jq).
 
 ## Sessions
-- Each session has its own base session, directories, options, and state.
+- Sessions may already be running.
+- Each has its own base session, directories, options, and state.
 - A session has a limited number of worker threads. Commands may be unprocessed only because all workers are busy, e.g. with commands in other theories: check get_session_state.
-- Prefer unloading a stuck theory over restarting a session.
+- Prefer unloading a stuck theory over session restart.
 
 ## Edits and synchronisation
 - file_watcher service synchronises disk edits of loaded files. Most tools synchronise the file they work on immediately.

@@ -1,7 +1,7 @@
 /*  Title:      MCP/src/pide_mcp_tool_schema.scala
     Author:     Kevin Kappelmann
 
-Shared JSON-Schema fragments for MCP tools.
+Shared JSON-Schema fragments for tools.
 */
 
 package isabelle.pide.mcp

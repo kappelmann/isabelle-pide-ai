@@ -35,7 +35,7 @@ class PIDE_MCP_Editor(mcp_session: PIDE_MCP_Session, progress: Progress) extends
   def insert_overlay(command: Command, fn: String, args: List[String]): Unit =
     mcp_session.insert_overlay(command, fn, args, progress)
   def remove_overlay(command: Command, fn: String, args: List[String]): Unit =
-    mcp_session.remove_overlay(command, fn, args, new Uncancellable_Progress(progress))
+    mcp_session.remove_overlay(command, fn, args, new Unstoppable_Progress(progress))
 
   def hyperlink_command(
     snapshot: Document.Snapshot,

@@ -4,6 +4,6 @@ requirements = \
   env:ISABELLE_SCALA_JAR \
   env:ISABELLE_PIDE_MCP_JAR
 sources = \
-  src/tool_sledgehammer.scala
+  src/sledgehammer_tool.scala
 services = \
-  isabelle.pide.mcp.extensions.Tools_Sledgehammer
+  isabelle.pide.mcp.extensions.Sledgehammer_Tools

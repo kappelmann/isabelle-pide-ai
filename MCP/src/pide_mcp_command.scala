@@ -29,12 +29,10 @@ object PIDE_MCP_Command {
     val unproblematic: Set[Status] = Set(unprocessed, finished)
     val problematic: Set[Status] = values.toSet -- unproblematic
 
-    def key(name: String): String = "cmds_" + name
-
-    def prefix_keys(obj: JSON.Object.T): JSON.Object.T = {
-      val keys = values.map(_.name).toSet + bad
-      obj.map { case (k, v) => if (keys.contains(k)) (key(k), v) else (k, v) }
-    }
+    val prefix = "cmds_"
+    def key(name: String): String = prefix + name
+    def prefix_keys(obj: JSON.Object.T): JSON.Object.T =
+      JSON_Object.prefix_keys(prefix, values.map(_.name).toSet + bad)(obj)
   }
 
   private def statuses(status: Document_Status.Command_Status): List[Status] =
@@ -282,19 +280,15 @@ object PIDE_MCP_Command {
     def apply(snapshot: Document.Snapshot, range: Option[Text.Range]): Iterator[State] =
       apply(snapshot, select(snapshot, range))
 
-    sealed case class Args(
+    sealed case class Report(
+      details: Set[State.Detail],
       summary_message_kinds: List[PIDE_MCP_Message.Message_Kind],
       problematic_limit: Option[Int],
       unproblematic_limit: Option[Int],
       occurrences_limit: Option[Int],
       snippet_lines: Int)
 
-    def json(
-      states: Iterator[State],
-      doc: Line.Document,
-      details: Set[State.Detail],
-      args: Args
-    ): JSON.Object.T = {
+    def json(states: Iterator[State], doc: Line.Document, report: Report): JSON.Object.T = {
       def redundant_problem(state: State, problem: Problem): Boolean =
         problem.text.isEmpty && problem.message_kind.exists(state.messages_of(_).nonEmpty)
       val counts = mutable.Map[String, Int]().withDefaultValue(0)
@@ -305,31 +299,31 @@ object PIDE_MCP_Command {
       var count_problematic = 0
       var count_unproblematic = 0
       var count_listed_occurrences = 0
-      val include_details = details.nonEmpty
+      val include_details = report.details.nonEmpty
       for (state <- states if !state.is_ignorable_now) {
         count += 1
         total_timing_ms += state.timing_ms
         for (status <- state.status if Status.unproblematic(status)) counts(status.name) += 1
         val problems = state.problems.filter(
-          _.message_kind.forall(args.summary_message_kinds.contains))
+          _.message_kind.forall(report.summary_message_kinds.contains))
         for (problem <- problems) {
           counts(problem.key) += 1
-          if (args.occurrences_limit.forall(count_listed_occurrences < _) &&
+          if (report.occurrences_limit.forall(count_listed_occurrences < _) &&
               !redundant_problem(state, problem)) {
             occurrences.getOrElseUpdate(problem.key, new mutable.ListBuffer[JSON.Object.T]) +=
-              problem.json(doc, args.snippet_lines)
+              problem.json(doc, report.snippet_lines)
             count_listed_occurrences += 1
           }
         }
         if (include_details) {
           if (problems.nonEmpty) {
-            if (args.problematic_limit.forall(count_problematic < _))
-              returned_commands += state.json(doc, details)
+            if (report.problematic_limit.forall(count_problematic < _))
+              returned_commands += state.json(doc, report.details)
             count_problematic += 1
           }
           else {
-            if (args.unproblematic_limit.forall(count_unproblematic < _))
-              returned_commands += state.json(doc, details)
+            if (report.unproblematic_limit.forall(count_unproblematic < _))
+              returned_commands += state.json(doc, report.details)
             count_unproblematic += 1
           }
         }

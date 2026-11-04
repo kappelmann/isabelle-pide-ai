@@ -1,4 +1,4 @@
-/*  Title:      MCP/src/Tools/tool_read.scala
+/*  Title:      MCP/src/Tools/read_tool.scala
     Author:     Kevin Kappelmann
 */
 
@@ -6,7 +6,7 @@ package isabelle.pide.mcp
 
 import isabelle._
 
-class Tool_Read extends PIDE_MCP_Tool("read") {
+class Read_Tool extends PIDE_MCP_Tool("read") {
   def description: String =
     "Read line-numbered content. " + PIDE_MCP_Tool_Schema.range_perspective + " " +
     PIDE_MCP_Tool_Schema.implicit_reload_file
@@ -16,12 +16,12 @@ class Tool_Read extends PIDE_MCP_Tool("read") {
       PIDE_MCP_Tool_Schema.start_line_default_arg, PIDE_MCP_Tool_Schema.opt_end_line_arg))
 
   def handle(
-    sessions: PIDE_MCP_Sessions,
+    server: PIDE_AI_Server,
     args: JSON.Object.T,
     progress: Progress
   ): PIDE_MCP_Tool_Result =
     PIDE_MCP_Tool_Result.result {
-      val session = PIDE_MCP_Tool_Util.running_session_param(sessions, args)
+      val session = PIDE_MCP_Tool_Util.running_session_param(server.sessions, args)
       val node_name = PIDE_MCP_Tool_Util.origin_param(session, args)
       val start_line = PIDE_MCP_Tool_Schema.start_line_default_arg.get(args)
       val opt_end_line = PIDE_MCP_Tool_Schema.opt_end_line_arg.get(args)
@@ -34,4 +34,4 @@ class Tool_Read extends PIDE_MCP_Tool("read") {
     }
 }
 
-class Tools_Read extends PIDE_MCP_Tools(new Tool_Read)
+class Read_Tools extends PIDE_MCP_Tools(new Read_Tool)

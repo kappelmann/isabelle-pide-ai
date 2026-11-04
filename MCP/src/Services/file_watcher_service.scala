@@ -1,4 +1,4 @@
-/*  Title:      MCP/src/Services/service_file_watcher.scala
+/*  Title:      MCP/src/Services/file_watcher_service.scala
     Author:     Kevin Kappelmann
 */
 
@@ -6,13 +6,15 @@ package isabelle.pide.mcp
 
 import isabelle._
 
-class Service_File_Watcher extends PIDE_MCP_Service("file_watcher") {
+object File_Watcher_Service {
+  def delay(options: Options): Time = options.seconds("pide_mcp_file_watcher_delay")
+}
+
+class File_Watcher_Service extends PIDE_MCP_Service("file_watcher") {
   def description: String = "Synchronise disk changes of loaded files."
 
   private val watchers = Synchronized(
     Map.empty[String, (PIDE_MCP_File_Watcher[Document.Node.Name], Progress)])
-
-  private def delay(options: Options): Time = options.seconds("pide_mcp_file_watcher_delay")
 
   private def loaded_files(session: PIDE_MCP_Session): () => List[Document.Node.Name] = {
     var cache = (Document.Version.init, List.empty[Document.Node.Name])
@@ -25,32 +27,31 @@ class Service_File_Watcher extends PIDE_MCP_Service("file_watcher") {
     }
   }
 
-  override def start(
-    sessions: PIDE_MCP_Sessions,
-    session: PIDE_MCP_Session,
-    progress: Progress
-  ): Unit = {
-    val log = sessions.log
-    val sync_progress = new Sub_Progress(sessions.base_progress)
+  override def started(event: PIDE_MCP_Service.Session_Event): Unit = {
+    val session = event.session
+    val log = event.server.log
+    val sync_progress = new Sub_Progress(event.server.base_progress)
     val watcher = new PIDE_MCP_File_Watcher[Document.Node.Name](
       session.id, loaded_files(session), _.path,
-      changed => Exn.result { session.sync_resolve(changed, sync_progress) } match {
+      changed => Exn.capture { session.sync_resolve(changed, sync_progress) } match {
+        case Exn.Exn(exn) if Exn.is_interrupt(exn) =>
+          if (!sync_progress.stopped)
+            log.error_message(s"File watcher ${quote(session.id)} interrupted")
+          throw exn
         case Exn.Exn(exn) =>
           log.warning(s"File watcher ${quote(session.id)} failed to synchronize: " +
             Exn.message(exn))
         case _ =>
       },
-      delay(session.options), log)
+      File_Watcher_Service.delay(session.options), log)
     watchers.change(_ + (session.id -> (watcher, sync_progress)))
   }
 
-  override def stop(
-    sessions: PIDE_MCP_Sessions,
-    session: PIDE_MCP_Session,
-    progress: Progress
-  ): Unit =
-    watchers.change_result(watchers => (watchers.get(session.id), watchers - session.id))
+  override def stopping(event: PIDE_MCP_Service.Session_Event): Unit = {
+    val id = event.session.id
+    watchers.change_result(watchers => (watchers.get(id), watchers - id))
       .foreach { case (watcher, sync_progress) => sync_progress.stop(); watcher.shutdown() }
+  }
 }
 
-class Services_File_Watcher extends PIDE_MCP_Services(new Service_File_Watcher)
+class File_Watcher_Services extends PIDE_MCP_Services(new File_Watcher_Service)

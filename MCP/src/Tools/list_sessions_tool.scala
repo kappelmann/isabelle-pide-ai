@@ -1,4 +1,4 @@
-/*  Title:      MCP/src/Tools/tool_list_sessions.scala
+/*  Title:      MCP/src/Tools/list_sessions_tool.scala
     Author:     Kevin Kappelmann
 */
 
@@ -6,17 +6,17 @@ package isabelle.pide.mcp
 
 import isabelle._
 
-class Tool_List_Sessions extends PIDE_MCP_Tool("list_sessions") {
+class List_Sessions_Tool extends PIDE_MCP_Tool("list_sessions") {
   def description: String = "List all sessions."
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(Nil)
   override def annotations: Option[JSON.Object.T] = Some(JSON_Object("readOnlyHint" -> true))
 
   def handle(
-    sessions: PIDE_MCP_Sessions,
+    server: PIDE_AI_Server,
     args: JSON.Object.T,
     progress: Progress
   ): PIDE_MCP_Tool_Result =
-    PIDE_MCP_Tool_Result.result { sessions.state_json() }
+    PIDE_MCP_Tool_Result.result { server.sessions.state_json() }
 }
 
-class Tools_List_Sessions extends PIDE_MCP_Tools(new Tool_List_Sessions)
+class List_Sessions_Tools extends PIDE_MCP_Tools(new List_Sessions_Tool)

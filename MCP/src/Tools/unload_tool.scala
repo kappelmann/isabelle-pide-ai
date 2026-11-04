@@ -1,4 +1,4 @@
-/*  Title:      MCP/src/Tools/tool_unload.scala
+/*  Title:      MCP/src/Tools/unload_tool.scala
     Author:     Kevin Kappelmann
 */
 
@@ -6,12 +6,12 @@ package isabelle.pide.mcp
 
 import isabelle._
 
-class Tool_Unload extends PIDE_MCP_Tool("unload") {
+class Unload_Tool extends PIDE_MCP_Tool("unload") {
   def description: String =
     "Unload origins and their dependents. " +
     "Use only if a theory is stuck or resources must be freed."
 
-  private val origins_arg = JSON_Schema.Arg.required("origins", "",
+  val origins_arg = JSON_Schema.Arg.required("origins", "",
     JSON_Schema.Format.list(JSON_Schema.Format.string))
 
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(
@@ -20,12 +20,12 @@ class Tool_Unload extends PIDE_MCP_Tool("unload") {
   override def annotations: Option[JSON.Object.T] = Some(JSON_Object("destructiveHint" -> true))
 
   def handle(
-    sessions: PIDE_MCP_Sessions,
+    server: PIDE_AI_Server,
     args: JSON.Object.T,
     progress: Progress
   ): PIDE_MCP_Tool_Result =
     PIDE_MCP_Tool_Result.result {
-      val session = PIDE_MCP_Tool_Util.running_session_param(sessions, args)
+      val session = PIDE_MCP_Tool_Util.running_session_param(server.sessions, args)
       val origins = origins_arg.get(args)
       val node_names = origins.map(session.node_name)
       val (unloaded, change) = session.unload(node_names, progress)
@@ -34,4 +34,4 @@ class Tool_Unload extends PIDE_MCP_Tool("unload") {
     }
 }
 
-class Tools_Unload extends PIDE_MCP_Tools(new Tool_Unload)
+class Unload_Tools extends PIDE_MCP_Tools(new Unload_Tool)

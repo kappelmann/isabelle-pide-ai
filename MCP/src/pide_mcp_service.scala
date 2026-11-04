@@ -9,71 +9,37 @@ import isabelle._
 object PIDE_MCP_Service {
   val kind: String = "service"
 
-  val max_name_length: Int = 128
-  def valid_name(name: String): Boolean =
-    name.nonEmpty && name.length <= max_name_length &&
-    name.forall(c => Symbol.is_ascii_letter(c) || Symbol.is_ascii_digit(c) || "_-.".contains(c))
+  val max_id_length: Int = 128
+  def valid_id(id: String): Boolean =
+    id.nonEmpty && id.length <= max_id_length &&
+    id.forall(c => Symbol.is_ascii_letter(c) || Symbol.is_ascii_digit(c) || "_-.".contains(c))
 
-  val all_option: String = "*"
-
-  private[mcp] def make_table[A <: PIDE_MCP_Service](
-    kind: String,
-    entries: List[A],
-    include_names: String,
-    exclude_names: String
-  ): Map[String, A] = {
-    val table = entries.foldLeft(Map.empty[String, A]) {
-      case (table, entry) =>
-        if (table.isDefinedAt(entry.name))
-          error(s"Duplicate PIDE_MCP $kind: ${Library.quote(entry.name)}")
-        else table + (entry.name -> entry)
-    }
-    def select(names: String): Set[String] =
-      if (names == all_option) table.keySet
-      else {
-        val list = space_explode(',', names)
-        val unknown = list.filterNot(table.isDefinedAt)
-        if (unknown.nonEmpty)
-          error(s"Unknown PIDE_MCP $kind(s): ${commas_quote(unknown)}. " +
-            s"Available $kind(s): ${commas_quote(table.keys.toList.sorted)}")
-        list.toSet
-      }
-    val included = select(include_names)
-    val excluded = select(exclude_names)
-    table.filter { case (name, _) => included(name) && !excluded(name) }
-  }
+  def include_ids(options: Options): String = options.string("pide_mcp_services_include")
+  def exclude_ids(options: Options): String = options.string("pide_mcp_services_exclude")
 
   def make_table(
-    include_names: String = all_option,
-    exclude_names: String = ""
+    include_ids: String = PIDE_AI_Registry.all_option,
+    exclude_ids: String = ""
   ): Map[String, PIDE_MCP_Service] =
-    make_table(kind,
-      Isabelle_System.make_services(classOf[PIDE_MCP_Services]).flatMap(_.entries),
-      include_names, exclude_names)
+    PIDE_AI_Registry.make_table(kind,
+      Isabelle_System.make_services(classOf[PIDE_MCP_Services]).flatMap(_.entries), _.id,
+      include_ids, exclude_ids)
+
+  sealed case class Session_Event(
+    server: PIDE_AI_Server,
+    session: PIDE_MCP_Session,
+    progress: Progress)
 }
 
-abstract class PIDE_MCP_Service(val name: String) {
+abstract class PIDE_MCP_Service(val id: String)
+extends Lifecycle_Hooks[PIDE_MCP_Service.Session_Event, PIDE_MCP_Service.Session_Event] {
   def kind: String = PIDE_MCP_Service.kind
 
-  if (!PIDE_MCP_Service.valid_name(name)) error(s"Bad PIDE_MCP $kind name: ${quote(name)}")
+  if (!PIDE_MCP_Service.valid_id(id)) error(s"Bad PIDE_MCP $kind id: ${quote(id)}")
 
   def description: String
 
-  def json: JSON.Object.T = JSON_Object("name" -> name, "description" -> description)
-
-  // called after each session start
-  def start(
-    sessions: PIDE_MCP_Sessions,
-    session: PIDE_MCP_Session,
-    progress: Progress
-  ): Unit = ()
-  // called before each session stop (normal) or after (abrupt stop)
-  // note: the service's start might not have been finished or called yet
-  def stop(
-    sessions: PIDE_MCP_Sessions,
-    session: PIDE_MCP_Session,
-    progress: Progress
-  ): Unit = ()
+  def json: JSON.Object.T = JSON_Object("name" -> id, "description" -> description)
 }
 
 class PIDE_MCP_Services(services: PIDE_MCP_Service*) extends Isabelle_System.Service {

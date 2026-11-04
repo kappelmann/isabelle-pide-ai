@@ -1,26 +1,13 @@
 /*  Title:      MCP/src/progress_task.scala
     Author:     Kevin Kappelmann
 
-Asynchronous operation respecting progress cancellation.
+Tasks stopped via their progress.
 */
 
 package isabelle.pide.mcp
 
 import isabelle._
 
-abstract class Progress_Task(
-  name: String,
-  val progress: Progress,
-  daemon: Boolean = false
-) {
-  protected def run(): Unit
-
-  private val thread = Isabelle_Thread.create(
-    () => progress.interrupt_handler { run() },
-    name = name, daemon = daemon)
-
-  def start(): Unit = thread.start()
-  def stopped: Boolean = progress.stopped
+abstract class Progress_Task[A](val progress: Progress) extends Task[A] {
   def stop(): Unit = progress.stop()
-  def join(): Unit = thread.join()
 }
