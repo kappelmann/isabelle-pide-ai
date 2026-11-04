@@ -231,8 +231,8 @@ See [Tool\_Extensions](./Tool_Extensions) for such a component with experimental
 
 ## Related Work
 
-[I/Q](https://github.com/awslabs/AutoCorrode/tree/main/iq) is an alternative Isabelle MCP server that provides an Isabelle/jEdit-centred workflow (using a shared document state).
-Experience reports using both systems are very welcome: we hope that the strengths of both MCP servers can be combined in the future.
+- [I/Q](https://github.com/awslabs/AutoCorrode/tree/main/iq) is an alternative MCP server that provides an Isabelle/jEdit-centred workflow (using a shared document state).
+- [IC2](https://github.com/awslabs/AutoCorrode/tree/main/ic2) is an alternative command-line tool that integrates with I/Q.
 
 ## Feedback, Questions, Discussions
 
@@ -263,7 +263,7 @@ Cite the [preprint](https://hal.science/hal-05748384):
 }
 ```
 
-Cite PIDE MCP code release: 
+Cite PIDE AI code release:
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21218654.svg)](https://doi.org/10.5281/zenodo.21218654)
 ```
 @software{pide_mcp_code_release,
@@ -272,9 +272,9 @@ Cite PIDE MCP code release:
   license    = {LGPL-3.0},
   year       = 2026,
   publisher  = {Zenodo},
-  version    = {c13a4bd3c018},
-  doi        = {10.5281/zenodo.21218654},
-  url        = {https://doi.org/10.5281/zenodo.21218654}
+  version    = {2025-2-updated},
+  doi        = {10.5281/zenodo.22726529},
+  url        = {https://doi.org/10.5281/zenodo.22726529}
 }
 ```
 
@@ -282,7 +282,7 @@ Cite this repository:
 ```
 @software{pide_mcp_code,
   author  = {Kappelmann, Kevin},
-  title   = {{Isabelle PIDE MCP}},
+  title   = {{Isabelle PIDE AI}},
   license = {LGPL-3.0},
   year    = {2026},
   url     = {https://github.com/kappelmann/isabelle-pide-ai}

@@ -9,7 +9,7 @@ New in this PIDE AI version
 New in PIDE AI 2026
 ----------------------------
 
-* Repository renamed to `isabelle-pide-ai`; old URLs redirect.
+* Repository renamed to `isabelle-pide-ai` (old URLs redirect).
 * PIDE MCP is renamed to PIDE AI.
 * Skill `pide-mcp` is renamed to `pide-ai`. INCOMPATIBILITY.
 * Core moved to `AI` (`isabelle pide_ai`). `MCP` only contains the MCP front end (`isabelle pide_mcp`).
