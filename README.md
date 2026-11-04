@@ -60,7 +60,7 @@ To interactively explore the agent's changes, you may also run an Isabelle/jEdit
 2. Clone and navigate into this repository. Then check out the branch matching your Isabelle version, as explained further above:
     ```bash
     git clone <THIS_REPOSITORY>
-    cd isabelle-pide-mcp
+    cd isabelle-pide-ai
     git checkout <BRANCH>
     ```
     **Note for Windows users:** make sure that all `etc/settings` files use `LF` line breaks.
@@ -285,7 +285,7 @@ Cite this repository:
   title   = {{Isabelle PIDE MCP}},
   license = {LGPL-3.0},
   year    = {2026},
-  url     = {https://github.com/kappelmann/isabelle-pide-mcp}
+  url     = {https://github.com/kappelmann/isabelle-pide-ai}
 }
 ```
 
