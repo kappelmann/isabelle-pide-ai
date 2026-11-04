@@ -33,7 +33,7 @@ class File_Watcher_Service extends PIDE_AI_Service("file_watcher") {
     val sync_progress = new Sub_Progress(event.server.base_progress)
     val watcher = new PIDE_AI_File_Watcher[Document.Node.Name](
       session.id, loaded_files(session), _.path,
-      changed => Exn.capture { session.sync_resolve(changed, sync_progress) } match {
+      changed => Exn.capture { session.sync_loaded_resolve(changed, sync_progress) } match {
         case Exn.Exn(exn) if Exn.is_interrupt(exn) =>
           if (!sync_progress.stopped)
             log.error_message(s"File watcher ${quote(session.id)} interrupted")

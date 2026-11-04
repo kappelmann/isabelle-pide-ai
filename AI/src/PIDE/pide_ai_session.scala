@@ -294,12 +294,15 @@ class PIDE_AI_Session private(
     (models.map(model => model.node_name -> model.text).toMap, change)
   }
 
-  def sync(node_names: List[Document.Node.Name], progress: Progress): Document.Change =
+  def sync(
+    node_names: List[Document.Node.Name],
+    progress: Progress
+  ): (Map[Document.Node.Name, String], Document.Change) =
     with_lock(progress) {
       val nodes = tip_version(progress).nodes
       read_update(
         node_names.filter(name => PIDE_AI_Util.is_loaded_dynamic(nodes(name))).map(_ -> None),
-        hide_others = false, progress = progress)._2
+        hide_others = false, progress = progress)
     }
 
   def sync_resolve(node_names: List[Document.Node.Name], progress: Progress): Document.Change =
@@ -316,6 +319,16 @@ class PIDE_AI_Session private(
     with_lock(progress) {
       sync_resolve(PIDE_AI_Dependencies.known_dependencies(resources,
         tip_version(progress).nodes, node_names), progress)
+    }
+
+  def sync_loaded_resolve(
+    node_names: List[Document.Node.Name],
+    progress: Progress
+  ): Document.Change =
+    with_lock(progress) {
+      val (texts, _) = sync(node_names, progress)
+      resolve_dependencies(texts.keys.toList, progress)
+      tip_change
     }
 
   def read_update_resolve(
