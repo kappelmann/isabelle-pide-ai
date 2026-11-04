@@ -1,4 +1,4 @@
-<img height="60" alt="PIDE AI logo" align="right" src="./docs/pide_mcp.png" />
+<img height="60" alt="PIDE AI logo" align="right" src="./docs/pide_ai.png" />
 
 # Isabelle PIDE AI (formerly PIDE MCP)
 
@@ -17,11 +17,7 @@ This repository contains:
 **Hint:** If you have trouble installing, configuring, or running this project, 
 ask your agent for help and point it to this README.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./docs/pide_mcp_scene_dark.gif">
-  <source media="(prefers-color-scheme: light)" srcset="./docs/pide_mcp_scene.gif">
-  <img alt="One agent working in three Isabelle sessions at once: it edits two proofs, Isabelle reports errors, the agent fixes them and both sessions report success, while a third session is started, queried and stopped." src="./docs/pide_mcp_scene.gif">
-</picture>
+<img alt="One agent working in three Isabelle sessions at once: it edits two proofs, Isabelle reports errors, the agent fixes them and both sessions report success, while a third session is started, queried and stopped." src="./docs/pide_ai_scene.svg">
 
 ## Supported Isabelle Versions
 
