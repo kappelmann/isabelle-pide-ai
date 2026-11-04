@@ -5,6 +5,7 @@
 package isabelle.pide.mcp
 
 import isabelle._
+import isabelle.pide.ai._
 
 object PIDE_MCP_Endpoint {
   val name = "isabelle_pide_mcp"
@@ -27,7 +28,7 @@ extends PIDE_AI_Tool_Endpoint(server, connection, log) {
       serial: Long,
       message: String
     ) extends Event
-    case Tool_Result(id: JSON_RPC.Id, result: PIDE_MCP_Tool_Result) extends Event
+    case Tool_Result(id: JSON_RPC.Id, result: PIDE_AI_Tool_Result) extends Event
   }
 
   private val events = Mailbox[Event]()
@@ -40,7 +41,7 @@ extends PIDE_AI_Tool_Endpoint(server, connection, log) {
     tool_calls.collectFirst { case (id, (call, _)) if call.progress_token.contains(token) => id }
 
   private def read_input(): Unit = {
-    PIDE_MCP_Util.log_failure(log, "MCP input failure",
+    PIDE_AI_Util.log_failure(log, "MCP input failure",
       Exn.capture { connection.read_lines().foreach(line => events.send(Event.Input(line))) })
     events.send(Event.Stop)
   }
@@ -120,7 +121,7 @@ extends PIDE_AI_Tool_Endpoint(server, connection, log) {
       case Exn.Res(_) =>
       case Exn.Exn(exn) =>
         val id = JSON_RPC.id(json)
-        val message = PIDE_MCP_Util.handle_internal_error(log,
+        val message = PIDE_AI_Util.handle_internal_error(log,
           id.fold("notification")(id => "request " + JSON.Format(id)), exn)
         for (id <- id)
           Exn.result { respond_error(id, JSON_RPC.Error_Code.INTERNAL_ERROR, message) }

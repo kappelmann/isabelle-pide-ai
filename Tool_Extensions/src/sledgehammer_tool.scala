@@ -2,15 +2,15 @@
     Author:     Kevin Kappelmann
 */
 
-package isabelle.pide.mcp.extensions
+package isabelle.pide.ai.extensions
 
 import isabelle._
-import isabelle.pide.mcp._
+import isabelle.pide.ai._
 
-class Sledgehammer_Tool extends PIDE_MCP_Tool("sledgehammer") {
+class Sledgehammer_Tool extends PIDE_AI_Tool("sledgehammer") {
   def description: String =
     "Run sledgehammer on command's goal at the given line without modifying the file. " +
-    PIDE_MCP_Tool_Schema.implicit_load_file
+    PIDE_AI_Tool_Schema.implicit_load_file
 
   val line_arg = JSON_Schema.Arg.required(
     "line", "", JSON_Schema.Format.int(minimum = Some(1)))
@@ -35,7 +35,7 @@ class Sledgehammer_Tool extends PIDE_MCP_Tool("sledgehammer") {
     JSON_Schema.Format.int(minimum = Some(1)).map(Time.seconds(_), _.seconds.toInt))
 
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(
-    List(PIDE_MCP_Tool_Schema.running_session_arg, PIDE_MCP_Tool_Schema.origin_arg,
+    List(PIDE_AI_Tool_Schema.running_session_arg, PIDE_AI_Tool_Schema.origin_arg,
       line_arg, prefix_arg, provers_arg, isar_proofs_arg, try0_arg,
       proofs_limit_arg, timeout_arg))
 
@@ -47,7 +47,7 @@ class Sledgehammer_Tool extends PIDE_MCP_Tool("sledgehammer") {
     prefix: Option[String]
   ): Text.Offset = {
     val doc = Line.Document(source)
-    val range = PIDE_MCP_Util.check_text_range(doc, line, Some(line))
+    val range = PIDE_AI_Util.check_text_range(doc, line, Some(line))
     val text = range.substring(source).stripLineEnd
     val caret = prefix match {
         case None => text.length
@@ -66,24 +66,24 @@ class Sledgehammer_Tool extends PIDE_MCP_Tool("sledgehammer") {
     server: PIDE_AI_Server,
     args: JSON.Object.T,
     progress: Progress
-  ): PIDE_MCP_Tool_Result =
-    PIDE_MCP_Tool_Result.result {
-      val session = PIDE_MCP_Tool_Util.running_session_param(server.sessions, args)
-      val node_name = PIDE_MCP_Tool_Util.origin_param(session, args)
-      val snapshot = PIDE_MCP_Tool_Util.require_stable_origin_snapshot(session, node_name, progress)
+  ): PIDE_AI_Tool_Result =
+    PIDE_AI_Tool_Result.result {
+      val session = PIDE_AI_Tool_Util.running_session_param(server.sessions, args)
+      val node_name = PIDE_AI_Tool_Util.origin_param(session, args)
+      val snapshot = PIDE_AI_Tool_Util.require_stable_origin_snapshot(session, node_name, progress)
       val line = line_arg.get(args)
-      val context = PIDE_MCP_Editor.Context(node_name,
+      val context = PIDE_AI_Editor.Context(node_name,
         caret_offset(snapshot.node.source, line, prefix_arg.get(args)))
       val provers = provers_arg.get(args).getOrElse(
         session.options.string("sledgehammer_provers"))
       val query_args = List(provers,
         Value.Boolean(isar_proofs_arg.get(args)), Value.Boolean(try0_arg.get(args)))
       val proofs_limit = proofs_limit_arg.get(args)
-      new PIDE_MCP_Query(session, context, "sledgehammer", progress)
+      new PIDE_AI_Query(session, context, "sledgehammer", progress)
         .run(query_args, timeout_arg.get(args),
           stop = output => proofs_count(output) >= proofs_limit)
-        .json(PIDE_MCP_Message.Message_Kind.values.toList)
+        .json(PIDE_AI_Message.Message_Kind.values.toList)
     }
 }
 
-class Sledgehammer_Tools extends PIDE_MCP_Tools(new Sledgehammer_Tool)
+class Sledgehammer_Tools extends PIDE_AI_Tools(new Sledgehammer_Tool)

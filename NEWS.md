@@ -1,17 +1,24 @@
-PIDE MCP NEWS -- history of user-relevant changes
-=================================================
+PIDE AI NEWS -- history of user-relevant changes
+================================================
 
-New in this PIDE MCP version
-----------------------------
+New in this PIDE AI version
+---------------------------
 
 * Update to Isabelle version as specified in [ISABELLE\_VERSION](./ISABELLE_VERSION)
 
-New in PIDE MCP 2026
+New in PIDE AI 2026
 ----------------------------
 
-* `pide_mcp -p PORT` also serves command-based interactions on port `PORT`.
+* PIDE MCP is renamed to PIDE AI.
+* Skill `pide-mcp` is renamed to `pide-ai`. INCOMPATIBILITY.
+* Core moved to `AI` (`isabelle pide_ai`). `MCP` only contains the MCP front end (`isabelle pide_mcp`).
+* Options `pide_mcp_*` are renamed to `pide_ai_*`. INCOMPATIBILITY.
+* Extension API: package `isabelle.pide.mcp` is renamed to `isabelle.pide.ai`, classes `PIDE_MCP_Tool`, `PIDE_MCP_Service`, etc. to `PIDE_AI_*`;
+    extensions require `env:ISABELLE_PIDE_AI_JAR` instead of `env:ISABELLE_PIDE_MCP_JAR`. INCOMPATIBILITY.
+* Clients moved from `MCP/clients` to `AI/clients`.
+* `pide_mcp -p PORT` also serves all enabled protocols on TCP port `PORT`.
     If `PORT` is bound, `pide_mcp -p PORT` connects to the server running there.
-* New Isabelle tool `isabelle pide_ai` to run a command-based server.
+* New Isabelle tool `isabelle pide_ai` to run a server on a TCP port.
 * New command-based protocol and clients (in `MCP/clients`).
 * New TCP support and protocol extension mechanism, configurable via `pide_mcp_protocols_include` and `pide_mcp_protocols_exclude`.
     The TCP port serves all enabled protocols.

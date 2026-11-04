@@ -1,9 +1,9 @@
-title = PIDE MCP Tool Extensions
-module = $PIDE_MCP_TOOL_EXTENSIONS_JAR
+title = PIDE AI Tool Extensions
+module = $PIDE_AI_TOOL_EXTENSIONS_JAR
 requirements = \
   env:ISABELLE_SCALA_JAR \
-  env:ISABELLE_PIDE_MCP_JAR
+  env:ISABELLE_PIDE_AI_JAR
 sources = \
   src/sledgehammer_tool.scala
 services = \
-  isabelle.pide.mcp.extensions.Sledgehammer_Tools
+  isabelle.pide.ai.extensions.Sledgehammer_Tools

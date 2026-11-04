@@ -5,6 +5,7 @@
 package isabelle.pide.mcp
 
 import isabelle._
+import isabelle.pide.ai._
 
 // TODO: update once non-localhost addresses are allowed
 val PIDE_MCP_Proxy_Client_Info = new PIDE_AI_Client_Info("pide_mcp_proxy", PIDE_MCP_Protocol, {

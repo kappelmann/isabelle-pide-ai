@@ -1,0 +1,72 @@
+(* :mode=isabelle-options: *)
+
+section "Startup"
+
+option pide_ai_exit_on_failed_option_sessions : bool = true for pide_ai
+  -- "exit when a session specified in options fails to start"
+
+option pide_ai_await_option_sessions : bool = true for pide_ai
+  -- "await sessions specified in options before serving requests"
+
+
+section "Sessions"
+
+option pide_ai_session_statistics_limit : int = 200 for pide_ai
+  -- "maximum number of buffered runtime statistics samples per session"
+
+
+section "Extensions"
+
+option pide_ai_services_include : string = "*" for pide_ai
+  -- "comma-separated names of services to run or \"*\" to run all"
+
+option pide_ai_services_exclude : string = "" for pide_ai
+  -- "comma-separated names of services not to run or \"*\" to run none"
+
+option pide_ai_tools_include : string = "*" for pide_ai
+  -- "comma-separated names of tools to serve or \"*\" to serve all"
+
+option pide_ai_tools_exclude : string = "" for pide_ai
+  -- "comma-separated names of tools not to serve or \"*\" to serve none"
+
+option pide_ai_protocols_include : string = "*" for pide_ai
+  -- "comma-separated names of protocols to serve on the TCP port or \"*\" to serve all"
+
+option pide_ai_protocols_exclude : string = "" for pide_ai
+  -- "comma-separated names of protocols not to serve on the TCP port or \"*\" to serve none"
+
+option pide_ai_client_infos_include : string = "*" for pide_ai
+  -- "comma-separated names of client infos to advertise or \"*\" to advertise all"
+
+option pide_ai_client_infos_exclude : string = "" for pide_ai
+  -- "comma-separated names of client infos not to advertise or \"*\" to advertise none"
+
+option pide_ai_file_watcher_delay : real = 0.5 for pide_ai
+  -- "delay for polling loaded files for external changes (seconds)"
+
+option pide_ai_get_state_delay : real = 0.1 for pide_ai
+  -- "delay for checking command status while awaiting commands (seconds)"
+
+
+section "Documents"
+
+option pide_ai_range_context : int = 50 for pide_ai
+  -- "lines around a read or edited range that are added to the PIDE perspective"
+
+option pide_ai_unicode_symbols_disk : bool = false for pide_ai
+  -- "store Isabelle symbols in source files via Unicode"
+
+
+section "Timing"
+
+option pide_ai_poll_delay : real = 0.02 for pide_ai
+  -- "delay for polling during potentially blocking PIDE session operations (seconds)"
+
+option pide_ai_session_progress_delay : real = 5.0 for pide_ai
+  -- "delay for progress messages of potentially blocking PIDE session operations (seconds)"
+
+option pide_ai_long_running_threshold : real = 20 for pide_ai
+  -- "threshold for reporting long-running commands of session builds (seconds)"
+
+option pide_ai_protocol_handshake_timeout : real = 15 for pide_ai
+  -- "timeout for the protocol handshake at the start of a connection (seconds)"

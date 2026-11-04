@@ -1,0 +1,3 @@
+# -*- shell-script -*- :mode=shellscript:
+PIDE_AI_HOME="$COMPONENT"
+ISABELLE_PIDE_AI_JAR="$PIDE_AI_HOME/lib/isabelle_pide_ai.jar"

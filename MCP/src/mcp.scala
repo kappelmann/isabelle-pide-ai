@@ -7,6 +7,7 @@ Model Context Protocol.
 package isabelle.pide.mcp
 
 import isabelle._
+import isabelle.pide.ai._
 
 object MCP {
   val protocol_version = "2025-11-25"

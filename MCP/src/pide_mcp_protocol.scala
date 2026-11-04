@@ -5,6 +5,7 @@
 package isabelle.pide.mcp
 
 import isabelle._
+import isabelle.pide.ai._
 
 val PIDE_MCP_Protocol = new PIDE_AI_Protocol("mcp", new PIDE_MCP_Endpoint(_, _, _))
 
