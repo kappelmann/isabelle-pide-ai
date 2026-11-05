@@ -8,7 +8,8 @@ import isabelle._
 
 import scala.collection.immutable.VectorMap
 
-class Get_Session_State_Tool extends PIDE_AI_Tool("get_session_state") {
+class Get_Session_State_Tool extends PIDE_AI_Tool("get_session_state")
+with PIDE_AI_Tool.Read_Only {
   def description: String =
     "State of running sessions, information for their theories " +
     "(status, commands being processed,...), resource statistics,... " +
@@ -47,8 +48,6 @@ class Get_Session_State_Tool extends PIDE_AI_Tool("get_session_state") {
     List(PIDE_AI_Tool_Schema.running_sessions_arg, filter_origins_arg,
       include_cmds_processing_arg, include_thy_status_arg, include_loaded_thys_arg,
       include_session_dirs_arg, include_options_arg, include_statistics_arg))
-
-  override def annotations: Option[JSON.Object.T] = Some(JSON_Object("readOnlyHint" -> true))
 
   def handle(
     server: PIDE_AI_Server,

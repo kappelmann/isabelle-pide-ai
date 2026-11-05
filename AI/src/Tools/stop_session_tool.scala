@@ -6,7 +6,7 @@ package isabelle.pide.ai
 
 import isabelle._
 
-class Stop_Session_Tool extends PIDE_AI_Tool("stop_session") {
+class Stop_Session_Tool extends PIDE_AI_Tool("stop_session") with PIDE_AI_Tool.Destructive {
   def description: String = "Stop sessions. " +
     PIDE_AI_Tool_Schema.session_restart
 
@@ -16,8 +16,6 @@ class Stop_Session_Tool extends PIDE_AI_Tool("stop_session") {
 
   def input_schema: JSON.Object.T =
     JSON_Schema.object_schema(List(sessions_arg))
-
-  override def annotations: Option[JSON.Object.T] = Some(JSON_Object("destructiveHint" -> true))
 
   def handle(
     server: PIDE_AI_Server,

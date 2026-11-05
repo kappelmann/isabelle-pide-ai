@@ -44,8 +44,8 @@ To interactively explore the agent's changes, you may also run an Isabelle/jEdit
     In Isabelle/jEdit, it is sometimes necessary to reload manually (e.g. by using the F5 key). Isabelle/VSCode supports auto-reload. 
     Avoid editing a file while the agent works on it. You might have to merge conflicts by hand otherwise.
 - If you want the agent to see proof states in pre-built base sessions, you have to build them with `-o show_states`. Note that such builds take significantly longer!
-- By default, the server writes Isabelle symbols to files on disk as ASCII (e.g. `\<forall>`), as required by batch Isabelle tools like `isabelle build`.
-    Use option `pide_ai_unicode_symbols_disk` to write them via Unicode instead.
+- By default, the server uses Isabelle symbols via Unicode (e.g. `∀`) and writes them to disk as ASCII (e.g. `\<forall>`), as required by batch Isabelle tools like `isabelle build`.
+    Use options `pide_ai_unicode_symbols` and `pide_ai_unicode_symbols_disk` to change either representation.
     The tool `isabelle symbols -d|-e FILES` converts files in either direction.
 
 ## Installing PIDE AI

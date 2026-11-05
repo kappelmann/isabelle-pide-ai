@@ -6,19 +6,20 @@ package isabelle.pide.ai
 
 import isabelle._
 
-object PIDE_AI_Tool {
+object PIDE_AI_Tool extends PIDE_AI_Registry.Kind[PIDE_AI_Tool, PIDE_AI_Tools] {
   val kind: String = "tool"
+  val include_option: String = "pide_ai_tools_include"
+  val exclude_option: String = "pide_ai_tools_exclude"
+  def services: Class[PIDE_AI_Tools] = classOf[PIDE_AI_Tools]
+  def id(tool: PIDE_AI_Tool): String = tool.id
 
-  def include_ids(options: Options): String = options.string("pide_ai_tools_include")
-  def exclude_ids(options: Options): String = options.string("pide_ai_tools_exclude")
+  trait Read_Only extends PIDE_AI_Tool {
+    override def annotations: Option[JSON.Object.T] = Some(JSON_Object("readOnlyHint" -> true))
+  }
 
-  def make_table(
-    include_ids: String = PIDE_AI_Registry.all_option,
-    exclude_ids: String = ""
-  ): Map[String, PIDE_AI_Tool] =
-    PIDE_AI_Registry.make_table(kind,
-      Isabelle_System.make_services(classOf[PIDE_AI_Tools]).flatMap(_.entries), _.id,
-      include_ids, exclude_ids)
+  trait Destructive extends PIDE_AI_Tool {
+    override def annotations: Option[JSON.Object.T] = Some(JSON_Object("destructiveHint" -> true))
+  }
 }
 
 abstract class PIDE_AI_Tool(id: String) extends PIDE_AI_Service(id) {
@@ -40,6 +41,4 @@ abstract class PIDE_AI_Tool(id: String) extends PIDE_AI_Service(id) {
   ): PIDE_AI_Tool_Result
 }
 
-class PIDE_AI_Tools(tools: PIDE_AI_Tool*) extends Isabelle_System.Service {
-  def entries: List[PIDE_AI_Tool] = tools.toList
-}
+class PIDE_AI_Tools(tools: PIDE_AI_Tool*) extends PIDE_AI_Registry.Entries(tools.toList)

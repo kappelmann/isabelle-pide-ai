@@ -63,8 +63,12 @@ class PIDE_AI_Sessions(
     if (!entries.contains(base)) base
     else Iterator.from(2).map(base + "#" + _).find(!entries.contains(_)).get
 
-  private class Entry(val id: String, spec: PIDE_AI_Session_Spec, caller_progress: Progress)
-  extends Task[Unit] {
+  private class Entry(
+    val id: String,
+    base_options: Options,
+    spec: PIDE_AI_Session_Spec,
+    caller_progress: Progress
+  ) extends Task[Unit] {
     val started = Future.promise[PIDE_AI_Session]
     private val start_progress = new Sub_Progress(caller_progress)
     private val built = Synchronized(false)
@@ -124,7 +128,7 @@ class PIDE_AI_Sessions(
         val (session_options, session_background) = build_lock.with_lock(start_progress,
           s"Awaiting build queue for session ${quote(id)}", PIDE_AI_Sessions.build_delay(options),
           PIDE_AI_Session.progress_delay(options)) {
-          PIDE_AI_Session.build(spec, start_progress)
+          PIDE_AI_Session.build(base_options, spec, start_progress)
         }
         built.change(_ => true)
         start_progress.expose_interrupt()
@@ -173,6 +177,7 @@ class PIDE_AI_Sessions(
   }
 
   def start_session(
+    base_options: Options,
     spec: PIDE_AI_Session_Spec,
     progress: Progress
   ): PIDE_AI_Session = {
@@ -182,13 +187,27 @@ class PIDE_AI_Sessions(
       else if (entries.contains(session_id))
         error(s"Session id ${quote(session_id)} is already used")
       else {
-        val entry = new Entry(session_id, spec.copy(id = Some(session_id)), progress)
+        val entry =
+          new Entry(session_id, base_options, spec.copy(id = Some(session_id)), progress)
         val forked = Task.fork("pide_ai_session_" + session_id, entry)
         (entry, entries + (session_id -> (entry, forked)))
       }
     }
     try { entry.started.join }
     catch { case exn: Throwable if Exn.is_interrupt(exn) => entry.stop(); throw exn }
+  }
+
+  def start_session_reporting_build_status(
+    base_options: Options,
+    spec: PIDE_AI_Session_Spec,
+    progress: Progress
+  ): PIDE_AI_Session = {
+    val options = base_options ++ spec.options
+    start_session(base_options, spec,
+      PIDE_AI_Session.reporting_build_status_progress(progress,
+        delay = PIDE_AI_Session.build_report_nodes_status_delay(options),
+        long_running_threshold = PIDE_AI_Session.build_long_running_threshold(options),
+        log = log))
   }
 
   def stop_sessions(session_ids: Option[List[String]], progress: Progress): List[String] = {

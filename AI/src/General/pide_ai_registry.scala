@@ -36,4 +36,21 @@ object PIDE_AI_Registry {
     val excluded = select(exclude_ids)
     table.filter { case (id, _) => included(id) && !excluded(id) }
   }
+
+  abstract class Entries[A](val entries: List[A]) extends Isabelle_System.Service
+
+  trait Kind[A, S <: Entries[A]] {
+    def kind: String
+    def include_option: String
+    def exclude_option: String
+    def services: Class[S]
+    def id(entry: A): String
+
+    def include_ids(options: Options): String = options.string(include_option)
+    def exclude_ids(options: Options): String = options.string(exclude_option)
+
+    def make_table(include_ids: String = all_option, exclude_ids: String = ""): Map[String, A] =
+      PIDE_AI_Registry.make_table(kind,
+        Isabelle_System.make_services(services).flatMap(_.entries), id, include_ids, exclude_ids)
+  }
 }

@@ -31,10 +31,11 @@ object PIDE_AI_Message {
     elem: XML.Elem,
     ranges: List[Text.Range],
     snapshot: Document.Snapshot,
-    cmd: Option[Command]
+    cmd: Option[Command],
+    unicode_symbols: Boolean
   ) {
     lazy val text: String = PIDE_AI_Util.elem_body_plain_text(
-      cmd.fold(elem)(output_message(snapshot, _, elem)))
+      cmd.fold(elem)(output_message(snapshot, _, elem)), unicode_symbols)
   }
 
   def output_message(snapshot: Document.Snapshot, cmd: Command, msg: XML.Elem): XML.Elem =
@@ -47,7 +48,8 @@ object PIDE_AI_Message {
     snapshot: Document.Snapshot,
     cmd: Command,
     command_start: Text.Offset,
-    range: Text.Range
+    range: Text.Range,
+    unicode_symbols: Boolean
   ): Iterator[Message] = {
     def message_ranges(elem: XML.Elem): List[Text.Range] = {
       val ranges = PIDE_AI_Document_Command.elem_positions(snapshot, cmd, elem)
@@ -61,7 +63,7 @@ object PIDE_AI_Message {
       for {
         kind <- Message_Kind.of(elem)
         ranges = message_ranges(elem) if ranges.nonEmpty
-      } yield Message(kind, elem, ranges, snapshot, Some(cmd)))
+      } yield Message(kind, elem, ranges, snapshot, Some(cmd), unicode_symbols))
   }
 
   def messages_json(

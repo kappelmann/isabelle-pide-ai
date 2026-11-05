@@ -9,7 +9,7 @@ import isabelle._
 class PIDE_AI_Server(
   options: Options,
   val log: Logger,
-  val base_progress: Progress.Status,
+  val base_progress: Progress,
   val service_table: Map[String, PIDE_AI_Service],
   val tool_table: Map[String, PIDE_AI_Tool],
   val client_info_table: Map[String, PIDE_AI_Client_Info],
@@ -62,7 +62,8 @@ class PIDE_AI_Server(
   val startup = new PIDE_AI_Startup_Sessions(specs,
     await = PIDE_AI_Startup_Sessions.await(options),
     exit_on_failure = PIDE_AI_Startup_Sessions.exit_on_failure(options),
-    log, base_progress, (spec, progress) => sessions.start_session(spec, progress))
+    log, base_progress, (spec, progress) =>
+      sessions.start_session_reporting_build_status(Options.init(), spec, progress))
 
   def ready: Future[Unit] = startup.ready
 

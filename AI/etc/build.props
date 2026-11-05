@@ -16,6 +16,7 @@ sources = \
   src/Concurrent/queue_lock.scala \
   src/Concurrent/task.scala \
   src/Concurrent/task_scope.scala \
+  src/Concurrent/throttle.scala \
   src/Connection/line_connection.scala \
   src/Connection/line_connection_proxy.scala \
   src/TCP/pide_ai_tcp_client_connector.scala \

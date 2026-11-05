@@ -53,8 +53,11 @@ section "Documents"
 option pide_ai_range_context : int = 50 for pide_ai
   -- "lines around a read or edited range that are added to the PIDE perspective"
 
+option pide_ai_unicode_symbols : bool = true for pide_ai
+  -- "represent Isabelle symbols via Unicode"
+
 option pide_ai_unicode_symbols_disk : bool = false for pide_ai
-  -- "store Isabelle symbols in source files via Unicode"
+  -- "represent Isabelle symbols on disk via Unicode"
 
 
 section "Timing"
@@ -62,11 +65,17 @@ section "Timing"
 option pide_ai_poll_delay : real = 0.02 for pide_ai
   -- "delay for polling during potentially blocking PIDE session operations (seconds)"
 
-option pide_ai_session_progress_delay : real = 5.0 for pide_ai
+option pide_ai_session_progress_delay : real = 5 for pide_ai
   -- "delay for progress messages of potentially blocking PIDE session operations (seconds)"
 
-option pide_ai_long_running_threshold : real = 20 for pide_ai
+option pide_ai_build_long_running_threshold : real = 20 for pide_ai
   -- "threshold for reporting long-running commands of session builds (seconds)"
+
+option pide_ai_build_report_nodes_status_delay : real = 5 for pide_ai
+  -- "minimum delay between nodes status reports of session builds (seconds)"
+
+option pide_ai_log_long_running_threshold : real = 20 for pide_ai
+  -- "threshold for long-running commands in the server's console and log file (seconds)"
 
 option pide_ai_protocol_handshake_timeout : real = 15 for pide_ai
   -- "timeout for the protocol handshake at the start of a connection (seconds)"

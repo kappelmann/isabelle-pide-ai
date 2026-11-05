@@ -84,7 +84,7 @@ object PIDE_AI_Theory {
       val node_snapshot = session.switch(snapshot, name)
       lazy val doc = Line.Document(node_snapshot.node.source)
       val entries = (for {
-        state <- PIDE_AI_Document_Command.States(node_snapshot, None)
+        state <- PIDE_AI_Document_Command.States(node_snapshot, None, session.unicode_symbols)
         if state.status.contains(PIDE_AI_Document_Command.Status.running)
       } yield state.problem(PIDE_AI_Document_Command.Status.running).json(doc, 1)).toList
       proper_list(entries).map(session.origin(name) -> _)

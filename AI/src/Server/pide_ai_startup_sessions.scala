@@ -19,7 +19,7 @@ class PIDE_AI_Startup_Sessions(
   await: Boolean,
   exit_on_failure: Boolean,
   log: Logger,
-  base_progress: Progress.Status,
+  base_progress: Progress,
   start_session: (PIDE_AI_Session_Spec, Progress) => Unit
 ) extends Progress_Task[Unit](new Sub_Progress(base_progress) with Progress.Local_Interrupts) {
   private val finished = Future.promise[Unit]

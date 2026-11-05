@@ -6,7 +6,7 @@ package isabelle.pide.ai
 
 import isabelle._
 
-object List_Extensions_Tool extends PIDE_AI_Tool("list_extensions") {
+object List_Extensions_Tool extends PIDE_AI_Tool("list_extensions") with PIDE_AI_Tool.Read_Only {
   def description: String = "List services and tools."
 
   val names_arg = JSON_Schema.Arg.optional(
@@ -19,8 +19,6 @@ object List_Extensions_Tool extends PIDE_AI_Tool("list_extensions") {
 
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(
     List(names_arg, include_description_arg, include_input_schema_arg))
-
-  override def annotations: Option[JSON.Object.T] = Some(JSON_Object("readOnlyHint" -> true))
 
   def handle(
     server: PIDE_AI_Server,

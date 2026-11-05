@@ -6,7 +6,7 @@ package isabelle.pide.ai
 
 import isabelle._
 
-class Edit_Get_State_Tool extends PIDE_AI_Tool("edit_get_state") {
+class Edit_Get_State_Tool extends PIDE_AI_Tool("edit_get_state") with PIDE_AI_Tool.Destructive {
   def description: String =
     Edit_Tool.base_description + " " + Get_State_Tool.base_description("edited commands") +" " +
     PIDE_AI_Tool_Schema.range_perspective + " " + PIDE_AI_Tool_Schema.implicit_reload_file
@@ -15,8 +15,6 @@ class Edit_Get_State_Tool extends PIDE_AI_Tool("edit_get_state") {
 
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(
     Edit_Tool.edit_args ::: Get_State_Tool.Request.args(timeout_arg))
-
-  override def annotations: Option[JSON.Object.T] = Some(JSON_Object("destructiveHint" -> true))
 
   def handle(
     server: PIDE_AI_Server,

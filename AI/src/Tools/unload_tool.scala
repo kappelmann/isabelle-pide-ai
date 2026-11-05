@@ -6,7 +6,7 @@ package isabelle.pide.ai
 
 import isabelle._
 
-class Unload_Tool extends PIDE_AI_Tool("unload") {
+class Unload_Tool extends PIDE_AI_Tool("unload") with PIDE_AI_Tool.Destructive {
   def description: String =
     "Unload origins and their dependents. " +
     "Use only if a theory is stuck or resources must be freed."
@@ -16,8 +16,6 @@ class Unload_Tool extends PIDE_AI_Tool("unload") {
 
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(
     List(PIDE_AI_Tool_Schema.running_session_arg, origins_arg))
-
-  override def annotations: Option[JSON.Object.T] = Some(JSON_Object("destructiveHint" -> true))
 
   def handle(
     server: PIDE_AI_Server,

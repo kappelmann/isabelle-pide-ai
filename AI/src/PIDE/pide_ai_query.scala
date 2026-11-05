@@ -12,14 +12,16 @@ object PIDE_AI_Query {
     outcome: Outcome,
     elapsed: Time,
     output: Editor.Output,
-    command: Option[Command]
+    command: Option[Command],
+    unicode_symbols: Boolean
   ) {
     def messages: List[PIDE_AI_Message.Message] = {
       val ranges = command.flatMap(cmd =>
         output.snapshot.command_start(cmd).map(cmd.range + _)).toList
       output.messages.flatMap(elem =>
         PIDE_AI_Message.Message_Kind.of(elem).map(kind =>
-          PIDE_AI_Message.Message(kind, elem, ranges, output.snapshot, command)))
+          PIDE_AI_Message.Message(kind, elem, ranges, output.snapshot, command,
+            unicode_symbols)))
     }
 
     def json(kinds: List[PIDE_AI_Message.Message_Kind]): JSON.Object.T =
@@ -42,7 +44,7 @@ class PIDE_AI_Query(
     st => { status.change(_ => st); progress.echo(s"$operation $st") },
     out =>
       for (msg <- output.change_result(old => (out.messages.diff(old.messages), out))) {
-        val text = PIDE_AI_Util.elem_body_plain_text(msg)
+        val text = PIDE_AI_Util.elem_body_plain_text(msg, session.unicode_symbols)
         if (Protocol.is_error(msg)) progress.echo_error_message(text)
         else if (Protocol.is_warning_or_legacy(msg)) progress.echo_warning(text)
         else progress.echo(text)
@@ -81,7 +83,8 @@ class PIDE_AI_Query(
           Option.when(timeout.exists(Time.now() - start > _))(PIDE_AI_Query.Outcome.timeout)
         }
       }
-      PIDE_AI_Query.Result(outcome, Time.now() - start, output.value, query.get_location)
+      PIDE_AI_Query.Result(outcome, Time.now() - start, output.value, query.get_location,
+        session.unicode_symbols)
     }
     finally {
       if (!finished) Exn.capture { editor.send_wait_dispatcher { query.cancel_query() } }

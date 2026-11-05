@@ -5,23 +5,25 @@
 package isabelle.pide.ai
 
 import isabelle._
+import isabelle.symbols.Symbols
 
 import scala.collection.mutable
 import scala.collection.immutable.VectorMap
 
 object PIDE_AI_Definition {
-  def def_label(name_space_entry: Name_Space.Entry): String =
+  def def_label(name_space_entry: Name_Space.Entry, unicode_symbols: Boolean): String =
     if (Long_Name.qualifier(name_space_entry.def_label) == Markup.COMMAND) ""
-    else name_space_entry.def_label
+    else Symbols.output_decoded(unicode_symbols, name_space_entry.def_label)
 
   def unresolved(
     name_space_entry: Name_Space.Entry,
     name: String,
     origin: String,
     line: Int,
-    msg: String
+    msg: String,
+    unicode_symbols: Boolean
   ): PIDE_AI_Definition = PIDE_AI_Definition(name, name_space_entry.kind,
-    def_label(name_space_entry), origin = Some(origin), line = Some(line),
+    def_label(name_space_entry, unicode_symbols), origin = Some(origin), line = Some(line),
     note = Some(s"The definition entry's source file ${quote(origin)} " +
       s"could not be resolved: $msg"))
 
@@ -44,8 +46,8 @@ object PIDE_AI_Definition {
       node_origin: String,
       line: Int
     ): PIDE_AI_Definition = PIDE_AI_Definition(name, name_space_entry.kind,
-      def_label(name_space_entry), origin = Some(node_origin), line = Some(line),
-      snippet = Option.when(snippet_lines > 0)(
+      def_label(name_space_entry, session.unicode_symbols), origin = Some(node_origin),
+      line = Some(line), snippet = Option.when(snippet_lines > 0)(
         PIDE_AI_Util.numbered_lines_range(lines(node_name), line, line + snippet_lines - 1)))
 
     def resolve(name_space_entry: Name_Space.Entry, name: String): Option[PIDE_AI_Definition] = {
@@ -56,14 +58,18 @@ object PIDE_AI_Definition {
           Option.when(filter_origins.forall(_.contains(node_origin)))(
             resolved(name_space_entry, name, node_name, node_origin, line))
         }
-        catch { case ERROR(msg) => Some(unresolved(name_space_entry, name, origin, line, msg)) }
+        catch {
+          case ERROR(msg) =>
+            Some(unresolved(name_space_entry, name, origin, line, msg, session.unicode_symbols))
+        }
       name_space_entry.properties match {
         case Position.Item_Def_File(def_file, def_line, _) => resolve_at(def_file, def_line)
         case Position.Item_Def_Id(def_id, def_range) =>
           snapshot.find_command_position(def_id, def_range.start) match {
             case Some(pos) => resolve_at(pos.name, pos.line1)
             case None => Some(PIDE_AI_Definition(name, name_space_entry.kind,
-              def_label(name_space_entry), note = Some(def_entry_not_loaded)))
+              def_label(name_space_entry, session.unicode_symbols),
+              note = Some(def_entry_not_loaded)))
           }
         case _ => None
       }
@@ -86,7 +92,8 @@ object PIDE_AI_Definition {
       Markup.Elements(Markup.ENTITY), _ => {
       case (definitions, Text.Info(r, XML.Elem(Markup.Entity(name_space_entry), _)))
       if kinds.contains(name_space_entry.kind) =>
-        val name = PIDE_AI_Util.display_name(Some(name_space_entry), r, snapshot.node.source)
+        val name = PIDE_AI_Util.display_name(Some(name_space_entry), r, snapshot.node.source,
+          session.unicode_symbols)
         context.resolve(name_space_entry, name).map(_ :: definitions)
       case _ => None
     }).flatMap(_.info)

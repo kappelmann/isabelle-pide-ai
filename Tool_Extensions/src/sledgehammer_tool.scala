@@ -7,7 +7,7 @@ package isabelle.pide.ai.extensions
 import isabelle._
 import isabelle.pide.ai._
 
-class Sledgehammer_Tool extends PIDE_AI_Tool("sledgehammer") {
+class Sledgehammer_Tool extends PIDE_AI_Tool("sledgehammer") with PIDE_AI_Tool.Read_Only {
   def description: String =
     "Run sledgehammer on command's goal at the given line without modifying the file. " +
     PIDE_AI_Tool_Schema.implicit_load_file
@@ -38,8 +38,6 @@ class Sledgehammer_Tool extends PIDE_AI_Tool("sledgehammer") {
     List(PIDE_AI_Tool_Schema.running_session_arg, PIDE_AI_Tool_Schema.origin_arg,
       line_arg, prefix_arg, provers_arg, isar_proofs_arg, try0_arg,
       proofs_limit_arg, timeout_arg))
-
-  override def annotations: Option[JSON.Object.T] = Some(JSON_Object("readOnlyHint" -> true))
 
   private def caret_offset(
     source: String,
@@ -73,7 +71,8 @@ class Sledgehammer_Tool extends PIDE_AI_Tool("sledgehammer") {
       val snapshot = PIDE_AI_Tool_Util.require_stable_origin_snapshot(session, node_name, progress)
       val line = line_arg.get(args)
       val context = PIDE_AI_Editor.Context(node_name,
-        caret_offset(snapshot.node.source, line, prefix_arg.get(args)))
+        caret_offset(snapshot.node.source, line,
+          prefix_arg.get(args).map(session.pide_text(node_name.path, _))))
       val provers = provers_arg.get(args).getOrElse(
         session.options.string("sledgehammer_provers"))
       val query_args = List(provers,

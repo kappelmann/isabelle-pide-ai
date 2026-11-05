@@ -26,7 +26,7 @@ class Queue_Lock {
     else {
       queue.change(_ ::: List(thread))
       try {
-        Progress_Await.await_guarded(queue, progress, {
+        PIDE_AI_Progress.await_guarded(queue, progress, {
             val n = ahead(queue.value)
             message + if_proper(n > 0, s" ($n ahead in queue)")
           }, delay, progress_delay)(threads => Option.when(holding(threads))(()))

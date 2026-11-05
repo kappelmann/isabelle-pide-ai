@@ -30,7 +30,7 @@ object Find_Entities_Tool {
   }
 }
 
-class Find_Entities_Tool extends PIDE_AI_Tool("find_entities") {
+class Find_Entities_Tool extends PIDE_AI_Tool("find_entities") with PIDE_AI_Tool.Read_Only {
   def description: String =
     "Find definition locations for entities (theorems, commands,...). " +
     PIDE_AI_Tool_Schema.implicit_load_file
@@ -55,8 +55,6 @@ class Find_Entities_Tool extends PIDE_AI_Tool("find_entities") {
     List(PIDE_AI_Tool_Schema.running_session_arg, PIDE_AI_Tool_Schema.origin_arg,
       PIDE_AI_Tool_Schema.start_line_arg, PIDE_AI_Tool_Schema.opt_end_line_arg,
       snippet_lines_arg, filter_origins_arg, kinds_arg))
-
-  override def annotations: Option[JSON.Object.T] = Some(JSON_Object("readOnlyHint" -> true))
 
   def handle(
     server: PIDE_AI_Server,

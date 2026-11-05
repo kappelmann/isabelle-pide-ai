@@ -88,7 +88,8 @@ object Get_State_Tool {
     val range = Some(PIDE_AI_Util.check_text_range(
       Line.Document(snapshot0.node.source), start_line, opt_end_line))
     val (snapshot, states, edited, timed_out) =
-      if (request.timeout.is_zero) (snapshot0, PIDE_AI_Document_Command.States(snapshot0, range), 0, false)
+      if (request.timeout.is_zero) (snapshot0,
+        PIDE_AI_Document_Command.States(snapshot0, range, session.unicode_symbols), 0, false)
       else
         PIDE_AI_Document_Command.await_states(session, snapshot0, range, request.stop_on.stop,
           Some(request.timeout), get_state_delay(session.options), progress)
@@ -98,7 +99,7 @@ object Get_State_Tool {
   }
 }
 
-class Get_State_Tool extends PIDE_AI_Tool("get_state") {
+class Get_State_Tool extends PIDE_AI_Tool("get_state") with PIDE_AI_Tool.Read_Only {
   def description: String =
     Get_State_Tool.base_description("commands in range") + " " +
     PIDE_AI_Tool_Schema.implicit_load_file
@@ -109,8 +110,6 @@ class Get_State_Tool extends PIDE_AI_Tool("get_state") {
     List(PIDE_AI_Tool_Schema.running_session_arg, PIDE_AI_Tool_Schema.origin_arg,
       PIDE_AI_Tool_Schema.start_line_default_arg, PIDE_AI_Tool_Schema.opt_end_line_arg) :::
     Get_State_Tool.Request.args(timeout_arg))
-
-  override def annotations: Option[JSON.Object.T] = Some(JSON_Object("readOnlyHint" -> true))
 
   def handle(
     server: PIDE_AI_Server,

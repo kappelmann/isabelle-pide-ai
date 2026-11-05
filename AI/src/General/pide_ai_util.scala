@@ -7,6 +7,7 @@ General utilities.
 package isabelle.pide.ai
 
 import isabelle._
+import isabelle.symbols.Symbols
 
 object PIDE_AI_Util {
   def log_failure(log: Logger, what: String, result: Exn.Result[?]): Unit =
@@ -101,8 +102,14 @@ object PIDE_AI_Util {
 
   def path(s: String): Path = Path.explode(File.standard_path(s))
 
-  def display_name(entry: Option[Name_Space.Entry], range: Text.Range, source: String): String =
-    entry.map(_.name).filter(_.nonEmpty).getOrElse(range.substring(source))
+  def display_name(
+    entry: Option[Name_Space.Entry],
+    range: Text.Range,
+    source: String,
+    unicode_symbols: Boolean
+  ): String =
+    entry.map(_.name).filter(_.nonEmpty).map(Symbols.output_decoded(unicode_symbols, _))
+      .getOrElse(range.substring(source))
 
   // a cleaned node remains in version.nodes but with empty source
   def is_loaded_dynamic(node: Document.Node): Boolean =
@@ -120,15 +127,16 @@ object PIDE_AI_Util {
   def restrict_ranges(ranges: Iterable[Text.Range], range: Text.Range): List[Text.Range] =
     ranges.iterator.filter(_.overlaps(range)).map(_.restrict(range)).toList
 
-  def elem_body_plain_text(elem: XML.Elem): String =
-    Pretty.string_of(elem.body, pure = true)
+  def elem_body_plain_text(elem: XML.Elem, unicode_symbols: Boolean): String =
+    Symbols.output_decoded(unicode_symbols, Pretty.string_of(elem.body, pure = true))
 
-  def xml_json(tree: XML.Tree): JSON.Object.T =
+  def xml_json(tree: XML.Tree, unicode_symbols: Boolean): JSON.Object.T =
     tree match {
       case XML.Elem(Markup(name, props), body) =>
-        val props_obj = JSON_Object(props)
-        val base = JSON_Object("name" -> name, "body" -> body.map(xml_json))
+        val props_obj =
+          JSON_Object(props.map((a, b) => a -> Symbols.output_decoded(unicode_symbols, b)))
+        val base = JSON_Object("name" -> name, "body" -> body.map(xml_json(_, unicode_symbols)))
         if (props_obj.isEmpty) base else base + ("props" -> props_obj)
-      case XML.Text(text) => JSON_Object("text" -> text)
+      case XML.Text(text) => JSON_Object("text" -> Symbols.output_decoded(unicode_symbols, text))
     }
 }

@@ -16,7 +16,7 @@ Unlike MCP, the CLI shows progress and you can filter output as you like (e.g. j
 ## Edits and synchronisation
 - file_watcher service synchronises disk edits of loaded files. Most tools synchronise the file they work on immediately.
 - Edits re-check all later commands, also in dependent theories: check beyond the edited range.
-- PIDE AI uses Unicode symbols (e.g. ∀ for \<forall>) internally and follows option pide_ai_unicode_symbols_disk for disk operations, configurable on session start. Non-PIDE Isabelle tools may require ASCII: recode with `isabelle symbols`.
+- PIDE AI uses symbols (e.g. ∀ vs. \<forall>) as per options pide_ai_unicode_symbols (server) and pide_ai_unicode_symbols_disk (disk). Inputs may use either. Non-PIDE Isabelle tools may require ASCII: recode with `isabelle symbols`.
 
 ## Checking state
 - Check your changes: get_state for local information (errors, goals, sorrys in a file), get_session_state for global information (all theories' status, processing commands), edit_get_state to edit and get_state for edited commands.

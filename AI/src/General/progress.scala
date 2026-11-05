@@ -10,7 +10,7 @@ import isabelle._
 
 import scala.annotation.tailrec
 
-object Progress_Await {
+object PIDE_AI_Progress {
   def await[A](
     progress: Progress,
     message: => String,
@@ -52,49 +52,8 @@ object Progress_Await {
   )(value: S => Option[A]): A =
     await(progress, message, progress_delay)(
       state.timed_access(_ => Some(Time.now() + delay), s => value(s).map(_ -> s)))
-}
 
-class Silent_Progress(progress: Progress) extends Progress {
-  override def verbose: Boolean = progress.verbose
-  override def stopped: Boolean = progress.stopped
-  override def stop(): Unit = progress.stop()
-  override def interrupt_handler[A](e: => A): A = progress.interrupt_handler(e)
-  override def output(messages: Progress.Output): Unit = ()
-  override def nodes_status(status: Progress.Nodes_Status): Unit = ()
-}
-
-class Sub_Progress(progress: Progress) extends Progress {
-  override def verbose: Boolean = progress.verbose
-  override def stopped: Boolean = super.stopped || progress.stopped
-  override def interrupt_handler[A](e: => A): A = progress.interrupt_handler(e)
-  override def output(messages: Progress.Output): Unit = progress.output(messages)
-  override def nodes_status(status: Progress.Nodes_Status): Unit = progress.nodes_status(status)
-}
-
-class Reporting_Progress(
-  base_progress: Progress.Status,
-  report_progress: Option[(Long, String) => Unit]
-) extends Sub_Progress(base_progress) with Progress.Local_Interrupts {
-  private var serial: Long = 0L
-  private var reporting = true
-
-  def stop_reporting(): Unit = synchronized { reporting = false }
-
-  private def report_messages(messages: Progress.Output): Unit =
-    for {
-      report <- report_progress if reporting
-      message <- messages if do_output(message)
-    } {
-      serial += 1
-      report(serial, message.message.output_text)
-    }
-
-  override def output(messages: Progress.Output): Unit = synchronized {
-    super.output(messages)
-    report_messages(messages)
-  }
-
-  private def theories_summary(status: Progress.Nodes_Status): Option[Progress.Msg] = {
+  def theories_progress_msg(status: Progress.Nodes_Status): Option[Progress.Msg] = {
     val theories = status.domain.map(name => name.theory -> status(name))
     Option.when(theories.nonEmpty) {
       val finished = theories.count({ case (_, st) => st.percentage == 100 })
@@ -107,39 +66,74 @@ class Reporting_Progress(
     }
   }
 
-  override def nodes_status(status: Progress.Nodes_Status): Unit = synchronized {
-    super.nodes_status(status)
-    report_messages(theories_summary(status).toList :::
-      status.long_running_commands(base_progress.status_threshold).map(_.copy(verbose = false)))
-  }
+  def long_running_output(threshold: Time)(status: Progress.Nodes_Status): Progress.Output =
+    status.long_running_commands(threshold).map(_.copy(verbose = false))
+
+  def progress_long_running_output(threshold: Time)(
+    status: Progress.Nodes_Status
+  ): Progress.Output =
+    theories_progress_msg(status).toList ::: long_running_output(threshold)(status)
 }
 
-class Unstoppable_Progress(progress: Progress) extends Progress {
+abstract class Wrapped_Progress(progress: Progress) extends Progress {
+  override def now(): Date = progress.now()
   override def verbose: Boolean = progress.verbose
-  override def stopped: Boolean = false
-  override def stop(): Unit = ()
+  override def stopped: Boolean = progress.stopped
+  override def stop(): Unit = progress.stop()
+  override def interrupt_handler[A](e: => A): A = progress.interrupt_handler(e)
   override def output(messages: Progress.Output): Unit = progress.output(messages)
   override def nodes_status(status: Progress.Nodes_Status): Unit = progress.nodes_status(status)
 }
 
-class Console_File_Progress(
-  path: Path,
-  override val verbose: Boolean = false,
-  threshold: Time,
-  detailed: Boolean = false,
-  stderr: Boolean = true)
-extends Progress with Progress.Global_Interrupts with Progress.Status {
-  private val console = new Console_Progress(verbose = verbose, stderr = stderr)
-  private val file = new File_Progress(path, verbose = verbose)
+class Silent_Progress(progress: Progress) extends Wrapped_Progress(progress) {
+  override def output(messages: Progress.Output): Unit = ()
+  override def nodes_status(status: Progress.Nodes_Status): Unit = ()
+}
 
-  override def status_threshold: Time = threshold
-  override def status_detailed: Boolean = detailed
-  override def status_output(msgs: Progress.Output): Unit = {
-    console.status_output(msgs)
-    file.status_output(msgs)
+class Recode_Progress(progress: Progress, unicode_symbols: Boolean)
+extends Wrapped_Progress(progress) {
+  override def output(messages: Progress.Output): Unit =
+    super.output(messages.map {
+      case msg: Progress.Message => msg.copy(text = Symbol.output(unicode_symbols, msg.text))
+      case msg => msg
+    })
+}
+
+class Sub_Progress(progress: Progress) extends Wrapped_Progress(progress) {
+  @volatile private var is_stopped = false
+  override def stop(): Unit = { is_stopped = true }
+  override def stopped: Boolean = is_stopped || progress.stopped
+}
+
+class Reporting_Progress(
+  progress: Progress,
+  report_output: Progress.Output => Unit = _ => (),
+  report_nodes_status: Progress.Nodes_Status => Unit = _ => ()
+) extends Wrapped_Progress(progress) {
+  private var reporting = true
+
+  def stop_reporting(): Unit = synchronized { reporting = false }
+
+  override def output(messages: Progress.Output): Unit = synchronized {
+    super.output(messages)
+    if (reporting) report_output(messages.filter(do_output))
   }
-  override def status_hide(msgs: Progress.Output): Unit = {
-    console.status_hide(msgs)
-    file.status_hide(msgs)
+
+  override def nodes_status(status: Progress.Nodes_Status): Unit = synchronized {
+    super.nodes_status(status)
+    if (reporting) report_nodes_status(status)
   }
+}
+
+class Unstoppable_Progress(progress: Progress) extends Wrapped_Progress(progress) {
+  override def stopped: Boolean = false
+  override def stop(): Unit = ()
+  override def interrupt_handler[A](e: => A): A = e
+}
+
+class Tee_Progress(progresses: Progress*) extends Progress {
+  override def verbose: Boolean = progresses.exists(_.verbose)
+  override def output(messages: Progress.Output): Unit = progresses.foreach(_.output(messages))
+  override def nodes_status(status: Progress.Nodes_Status): Unit =
+    progresses.foreach(_.nodes_status(status))
 }

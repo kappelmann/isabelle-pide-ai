@@ -15,14 +15,32 @@ object PIDE_AI_Session {
   def poll_delay(options: Options): Time = options.seconds("pide_ai_poll_delay")
   def range_context(options: Options): Int = options.int("pide_ai_range_context")
   def statistics_limit(options: Options): Int = options.int("pide_ai_session_statistics_limit")
+  def unicode_symbols(options: Options): Boolean = options.bool("pide_ai_unicode_symbols")
   def unicode_symbols_disk(options: Options): Boolean =
     options.bool("pide_ai_unicode_symbols_disk")
+  def build_long_running_threshold(options: Options): Time =
+    options.seconds("pide_ai_build_long_running_threshold")
+  def build_report_nodes_status_delay(options: Options): Time =
+    options.seconds("pide_ai_build_report_nodes_status_delay")
+
+  def reporting_build_status_progress(
+    progress: Progress,
+    delay: Time,
+    long_running_threshold: Time,
+    log: Logger
+  ): Progress = {
+    val report = new Throttle[Progress.Nodes_Status](delay, log)(status =>
+      progress.output(
+        PIDE_AI_Progress.progress_long_running_output(long_running_threshold)(status)))
+    new Reporting_Progress(progress, report_nodes_status = status =>
+      if (status.domain.nonEmpty) report(status))
+  }
 
   def build(
+    base_options: Options,
     spec: PIDE_AI_Session_Spec,
     progress: Progress
   ): (Options, Sessions.Background) = {
-    val base_options = Options.init()
     val options = base_options ++ spec.options
     val session_background = Sessions.background(options, spec.logic,
       progress = new Silent_Progress(progress),
@@ -30,7 +48,8 @@ object PIDE_AI_Session {
       session_requirements = spec.session_requirements).check_errors
     Build.build(options, selection = Sessions.Selection.session(session_background.session_name),
       build_heap = true, dirs = spec.dirs, infos = session_background.infos,
-      fresh_build = spec.fresh_build, no_build = spec.no_build, progress = progress).check
+      fresh_build = spec.fresh_build, no_build = spec.no_build,
+      progress = new Recode_Progress(progress, unicode_symbols(options))).check
     val session_options = base_options ++ (Options.Spec.eq("show_states", "true") ::
       Options.Spec.eq("editor_output_state", "false") :: spec.options)
     (session_options, session_background)
@@ -75,13 +94,14 @@ class PIDE_AI_Session private(
 ) {
   def resources: Headless.Resources = session.resources
   def options: Options = resources.options
+  val unicode_symbols: Boolean = PIDE_AI_Session.unicode_symbols(options)
   def disk_text(path: Path, text: String): String =
     if (Symbols.supports_isabelle_symbols(path)) {
       Symbol.output(PIDE_AI_Session.unicode_symbols_disk(options), text)
     }
     else text
   def pide_text(path: Path, text: String): String =
-    if (Symbols.supports_isabelle_symbols(path)) Symbol.decode(text) else text
+    if (Symbols.supports_isabelle_symbols(path)) Symbol.output(unicode_symbols, text) else text
 
   def base_session: String = resources.current_background.session_name
   def directories(): List[Path] = Sessions.directories(dirs, Nil).map(_._2)
@@ -165,7 +185,7 @@ class PIDE_AI_Session private(
     what: => String,
     delay: Time = PIDE_AI_Session.poll_delay(options)
   )(value: => Option[A]): A =
-    Progress_Await.await_delay(progress, await_message(what), delay,
+    PIDE_AI_Progress.await_delay(progress, await_message(what), delay,
       PIDE_AI_Session.progress_delay(options)) {
       require_ready()
       value
@@ -188,7 +208,7 @@ class PIDE_AI_Session private(
     node_name: Document.Node.Name
   ): Document.Snapshot = {
     if (is_base_session_theory(node_name))
-      session.read_theory(node_name.theory, unicode_symbols = true)
+      session.read_theory(node_name.theory, unicode_symbols = unicode_symbols)
     else {
       val snapshot1 = snapshot
       val new_snapshot = (if (is_base_session_theory(snapshot1.node_name)) session.snapshot()

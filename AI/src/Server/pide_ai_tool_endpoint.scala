@@ -23,7 +23,14 @@ abstract class PIDE_AI_Tool_Endpoint(
     report_progress: Option[(Long, String) => Unit],
     report_result: PIDE_AI_Tool_Result => Unit
   ): PIDE_AI_Tool_Call = {
-    val progress = new Reporting_Progress(server.base_progress, report_progress)
+    var serial = 0L
+    val progress = new Reporting_Progress(
+      new Sub_Progress(server.base_progress) with Progress.Local_Interrupts,
+      report_output = messages =>
+        for (report <- report_progress; message <- messages) {
+          serial += 1
+          report(serial, message.message.output_text)
+        })
     val call = new PIDE_AI_Tool_Call(server, tool, args, progress, log)
     tool_call_scope.fork("pide_ai_tool_call", call, on_finish = { result =>
       progress.stop_reporting()

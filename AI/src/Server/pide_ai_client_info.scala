@@ -8,19 +8,13 @@ package isabelle.pide.ai
 
 import isabelle._
 
-object PIDE_AI_Client_Info {
+object PIDE_AI_Client_Info
+extends PIDE_AI_Registry.Kind[PIDE_AI_Client_Info, PIDE_AI_Client_Infos] {
   val kind: String = "client info"
-
-  def include_ids(options: Options): String = options.string("pide_ai_client_infos_include")
-  def exclude_ids(options: Options): String = options.string("pide_ai_client_infos_exclude")
-
-  def make_table(
-    include_ids: String = PIDE_AI_Registry.all_option,
-    exclude_ids: String = ""
-  ): Map[String, PIDE_AI_Client_Info] =
-    PIDE_AI_Registry.make_table(kind,
-      Isabelle_System.make_services(classOf[PIDE_AI_Client_Infos]).flatMap(_.entries), _.id,
-      include_ids, exclude_ids)
+  val include_option: String = "pide_ai_client_infos_include"
+  val exclude_option: String = "pide_ai_client_infos_exclude"
+  def services: Class[PIDE_AI_Client_Infos] = classOf[PIDE_AI_Client_Infos]
+  def id(info: PIDE_AI_Client_Info): String = info.id
 }
 
 class PIDE_AI_Client_Info(
@@ -28,6 +22,5 @@ class PIDE_AI_Client_Info(
   val protocol: PIDE_AI_Protocol,
   val access_note: PIDE_AI_Connector[?] => Option[String])
 
-class PIDE_AI_Client_Infos(infos: PIDE_AI_Client_Info*) extends Isabelle_System.Service {
-  def entries: List[PIDE_AI_Client_Info] = infos.toList
-}
+class PIDE_AI_Client_Infos(infos: PIDE_AI_Client_Info*)
+extends PIDE_AI_Registry.Entries(infos.toList)

@@ -1,7 +1,7 @@
 /*  Title:      Symbols/src/symbols.scala
     Author:     Kevin Kappelmann
 
-Encode or decode Isabelle symbols in files.
+Encode or decode Isabelle symbols.
 */
 
 package isabelle.symbols
@@ -14,6 +14,9 @@ object Symbols {
     val name = path.file_name
     File.is_thy(name) || File.is_ML(name) || name.endsWith(".sml") || name.endsWith(".sig")
   }
+
+  def output_decoded(unicode_symbols: Boolean, text: String): String =
+    if (unicode_symbols) text else Symbol.encode(text)
 
   def recode_file(unicode_symbols: Boolean, path: Path): Unit = {
     val text = File.read(path)

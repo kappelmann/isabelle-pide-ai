@@ -129,15 +129,13 @@ object Edit_Tool {
   }
 }
 
-class Edit_Tool extends PIDE_AI_Tool("edit") {
+class Edit_Tool extends PIDE_AI_Tool("edit") with PIDE_AI_Tool.Destructive {
   def description: String =
     Edit_Tool.base_description +" " + PIDE_AI_Tool_Schema.range_perspective + " " +
     PIDE_AI_Tool_Schema.no_processing_wait + " " +
     PIDE_AI_Tool_Schema.implicit_reload_file
 
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(Edit_Tool.edit_args)
-
-  override def annotations: Option[JSON.Object.T] = Some(JSON_Object("destructiveHint" -> true))
 
   def handle(
     server: PIDE_AI_Server,

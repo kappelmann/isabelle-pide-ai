@@ -84,7 +84,7 @@ object PIDE_AI_Document_Command {
       "(line " + line + if_proper(!same_file(file), " of " + quote(file)) + ")"
     body.flatMap {
       case XML.Elem(Markup(Markup.POSITION, Position.Item_Id(id, range)), List(XML.Text(text)))
-      if text == here => if (self_id(snapshot.state, cmd)(id)) Nil
+      if Symbol.decode(text) == here => if (self_id(snapshot.state, cmd)(id)) Nil
         else snapshot.find_command_position(id, range.start)
           .map(pos => XML.Text(" " + line_text(pos.line1, pos.name))).toList
       case XML.Elem(markup @ Markup(Markup.POSITION, props @ Position.Line(line)), _)
@@ -179,7 +179,8 @@ object PIDE_AI_Document_Command {
     snapshot: Document.Snapshot,
     cmd: Command,
     range: Text.Range,
-    messages: List[PIDE_AI_Message.Message]
+    messages: List[PIDE_AI_Message.Message],
+    unicode_symbols: Boolean
   ) {
     lazy val command_status: Document_Status.Command_Status = snapshot.state.command_status(
       snapshot.version, cmd)
@@ -195,8 +196,8 @@ object PIDE_AI_Document_Command {
       messages_by_kind.getOrElse(kind, Nil)
     lazy val errors = messages_of(PIDE_AI_Message.Message_Kind.errors)
     lazy val warnings = messages_of(PIDE_AI_Message.Message_Kind.warnings)
-    lazy val bad: List[Text.Info[String]] = PIDE_AI_Markup.bad(snapshot, range).filterNot(info =>
-      errors.nonEmpty && info.info.isEmpty)
+    lazy val bad: List[Text.Info[String]] = PIDE_AI_Markup.bad(snapshot, range, unicode_symbols)
+      .filterNot(info => errors.nonEmpty && info.info.isEmpty)
     private def bad_json(doc: Line.Document): List[JSON.Object.T] =
       bad.map { case Text.Info(r, text) =>
         JSON_Object.flatten(
@@ -230,11 +231,14 @@ object PIDE_AI_Document_Command {
             details(State.Detail.of(kind)))) :::
         List(
           Option.when(details(State.Detail.types))(
-            proper_list(PIDE_AI_Markup.types_json(snapshot, range)).map("types" -> _)).flatten,
+            proper_list(PIDE_AI_Markup.types_json(snapshot, range, unicode_symbols))
+              .map("types" -> _)).flatten,
           Option.when(details(State.Detail.facts))(
-            proper_list(PIDE_AI_Markup.facts_json(snapshot, range)).map("facts" -> _)).flatten,
+            proper_list(PIDE_AI_Markup.facts_json(snapshot, range, unicode_symbols))
+              .map("facts" -> _)).flatten,
           Option.when(details(State.Detail.markup))(
-            "markup" -> PIDE_AI_Markup.markup_json(snapshot, range, Markup.Elements.full)))
+            "markup" -> PIDE_AI_Markup.markup_json(snapshot, range, Markup.Elements.full,
+              unicode_symbols)))
       JSON_Object.flatten(entries)
     }
   }
@@ -243,7 +247,8 @@ object PIDE_AI_Document_Command {
     def command_spans(
       snapshot: Document.Snapshot,
       theory_cmd: Command,
-      range: Option[Text.Range]
+      range: Option[Text.Range],
+      unicode_symbols: Boolean
     ): Iterator[State] =
       snapshot.command_spans(PIDE_AI_Util.restrict_text_range(snapshot.node.source, range))
         .iterator.map { span =>
@@ -252,20 +257,24 @@ object PIDE_AI_Document_Command {
             Rendering.text_messages(snapshot, restricted).flatMap(info =>
               PIDE_AI_Message.Message_Kind.of(info.info).map(kind =>
                 PIDE_AI_Message.Message(kind, info.info, List(info.range), snapshot,
-                  Some(theory_cmd)))))
+                  Some(theory_cmd), unicode_symbols))),
+            unicode_symbols)
         }
 
     def apply(
       snapshot: Document.Snapshot,
-      selection: List[(Command, Text.Range)]
+      selection: List[(Command, Text.Range)],
+      unicode_symbols: Boolean
     ): Iterator[State] =
       single_command(snapshot) match {
         case Some(single) =>
           selection.iterator.filter(_._1 == single).flatMap { case (cmd, range) =>
-            if (snapshot.node_name.is_theory) command_spans(snapshot, cmd, Some(range))
+            if (snapshot.node_name.is_theory)
+              command_spans(snapshot, cmd, Some(range), unicode_symbols)
             else {
-              val messages = PIDE_AI_Message.messages(snapshot, cmd, 0, range).toList
-              Iterator(State(snapshot, cmd, range, messages))
+              val messages =
+                PIDE_AI_Message.messages(snapshot, cmd, 0, range, unicode_symbols).toList
+              Iterator(State(snapshot, cmd, range, messages, unicode_symbols))
             }
           }
         case None =>
@@ -273,12 +282,17 @@ object PIDE_AI_Document_Command {
           for ((cmd, part) <- selection.iterator; start <- starts.get(cmd)) yield {
             val range = part + start
             State(snapshot, cmd, range,
-              PIDE_AI_Message.messages(snapshot, cmd, start, range).toList)
+              PIDE_AI_Message.messages(snapshot, cmd, start, range, unicode_symbols).toList,
+              unicode_symbols)
           }
       }
 
-    def apply(snapshot: Document.Snapshot, range: Option[Text.Range]): Iterator[State] =
-      apply(snapshot, select(snapshot, range))
+    def apply(
+      snapshot: Document.Snapshot,
+      range: Option[Text.Range],
+      unicode_symbols: Boolean
+    ): Iterator[State] =
+      apply(snapshot, select(snapshot, range), unicode_symbols)
 
     sealed case class Report(
       details: Set[State.Detail],
@@ -388,10 +402,12 @@ object PIDE_AI_Document_Command {
   ): (Document.Snapshot, Iterator[State], Int, Boolean) = {
     val selection = select(snapshot, range)
     val commands = selection.filterNot { case sel @ (cmd, _) =>
-      cmd.is_ignored && States(snapshot, List(sel)).forall(_.is_ignorable_for_good) }.map(_._1)
+      cmd.is_ignored &&
+        States(snapshot, List(sel), session.unicode_symbols).forall(_.is_ignorable_for_good)
+    }.map(_._1)
     val (snapshot1, survivors, timed_out) = await(session, commands, stop, timeout, delay, progress)
     val node_snapshot = session.switch(snapshot1, snapshot.node_name)
-    (node_snapshot, States(node_snapshot, selection),
+    (node_snapshot, States(node_snapshot, selection, session.unicode_symbols),
       commands.count(cmd => !cmd.is_ignored && !survivors.contains(cmd)), timed_out)
   }
 }

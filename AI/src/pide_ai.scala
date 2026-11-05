@@ -11,14 +11,14 @@ import isabelle._
 import java.net.ServerSocket
 
 object PIDE_AI {
-  def long_running_threshold(options: Options): Time =
-    options.seconds("pide_ai_long_running_threshold")
+  def log_long_running_threshold(options: Options): Time =
+    options.seconds("pide_ai_log_long_running_threshold")
 
   class Context(
     val options: Options,
     val specs: List[PIDE_AI_Session_Spec],
     val port: Option[Int],
-    val progress: Progress.Status,
+    val progress: Progress,
     val log: Logger,
     val message_log: Logger
   ) {
@@ -139,13 +139,14 @@ Usage: isabelle """ + name + """ [OPTIONS]
     val specs = (if (session_spec.has_session_option) session_spec.spec.toList else Nil) :::
       session_specs.map(spec => spec.copy(options = base_options ::: spec.options))
     val options = Options.init(update = base_options)
-    val threshold = long_running_threshold(options)
-    val progress = log_path match {
-      case None => new Console_Progress(
-        verbose = verbose, threshold = threshold, detailed = false, stderr = true)
-      case Some(path) => new Console_File_Progress(path,
-        verbose = verbose, threshold = threshold, detailed = false, stderr = true)
-    }
+    val threshold = log_long_running_threshold(options)
+    val console = new Console_Progress(verbose = verbose, threshold = threshold,
+      detailed = false, stderr = true)
+    val files = log_path.toList.map(path =>
+      new File_Progress(path, verbose = verbose) {
+        override def status_threshold: Time = threshold
+      })
+    val progress = new Tee_Progress((console :: files)*) with Progress.Global_Interrupts
     val log = Logger.make_progress(progress)
     val message_log = if (log_messages) log else Logger.none
 
