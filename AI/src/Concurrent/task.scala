@@ -7,12 +7,17 @@ package isabelle.pide.ai
 import isabelle._
 
 object Task {
-  def fork[A](name: String, task: Task[A], daemon: Boolean = false): Future[A] = {
+  trait Forked[A] extends Future[A] {
+    def thread: Thread
+  }
+
+  def fork[A](name: String, task: Task[A], daemon: Boolean = false): Forked[A] = {
     val result = Future.promise[A]
-    Isabelle_Thread.fork(name = name, daemon = daemon) {
+    val forked_thread = Isabelle_Thread.fork(name = name, daemon = daemon) {
       result.fulfill_result(Exn.capture { task.run() })
     }
-    new Future[A] {
+    new Forked[A] {
+      def thread: Thread = forked_thread
       def peek: Option[Exn.Result[A]] = result.peek
       def join_result: Exn.Result[A] = result.join_result
       def cancel(): Unit = task.stop()

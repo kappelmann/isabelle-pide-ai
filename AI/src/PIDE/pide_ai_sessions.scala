@@ -25,20 +25,19 @@ class PIDE_AI_Sessions(
 
   private enum Phase { case Building, Starting, Running, Stopping }
 
-  private val state = Synchronized[VectorMap[String, Entry]](VectorMap.empty)
+  private type Entries = VectorMap[String, (Entry, Task.Forked[Unit])]
+  private val state = Synchronized[Entries](VectorMap.empty)
 
-  private def state_json(entries: VectorMap[String, Entry]): JSON.Object.T = {
-    val grouped = entries.toList.groupBy { case (_, entry) => entry.phase }
+  private def state_json(entries: Entries): JSON.Object.T = {
+    val grouped = entries.toList.groupBy { case (_, (entry, _)) => entry.phase }
     JSON_Object(
       for (phase <- Phase.values.toList; ids <- grouped.get(phase))
         yield Word.lowercase(phase.toString) -> ids.map(_._1))
   }
   def state_json(): JSON.Object.T = state_json(state.value)
 
-  private def remove_session(session_id: String): Unit = state.change(_ - session_id)
-
   private def select[A](
-    entries: VectorMap[String, Entry],
+    entries: Entries,
     what: String,
     candidates: List[(String, A)],
     session_ids: Option[List[String]]
@@ -56,67 +55,69 @@ class PIDE_AI_Sessions(
 
   def running_sessions(session_ids: Option[List[String]]): List[PIDE_AI_Session] = {
     val entries = state.value
-    val running = entries.toList.flatMap { case (id, entry) => entry.running.map(id -> _) }
+    val running = entries.toList.flatMap { case (id, (entry, _)) => entry.running.map(id -> _) }
     select(entries, "running", running, session_ids).map(_._2)
   }
 
-  private def fresh_id(base: String, entries: VectorMap[String, Entry]): String =
+  private def fresh_id(base: String, entries: Entries): String =
     if (!entries.contains(base)) base
     else Iterator.from(2).map(base + "#" + _).find(!entries.contains(_)).get
 
-  private class Entry(val id: String, spec: PIDE_AI_Session_Spec, caller_progress: Progress) {
-    private val session_future = Future.promise[PIDE_AI_Session]
-    private val start_thread = Synchronized[Option[Thread]](None)
+  private class Entry(val id: String, spec: PIDE_AI_Session_Spec, caller_progress: Progress)
+  extends Task[Unit] {
+    val started = Future.promise[PIDE_AI_Session]
     private val start_progress = new Sub_Progress(caller_progress)
     private val built = Synchronized(false)
-    private val phase_consumer = Synchronized[Option[Session.Consumer[Session.Phase]]](None)
-    private val stop_requested = Synchronized(false)
-    private val stopped = Future.promise[Unit]
+    private val stop_request = Synchronized[Option[Progress]](None)
+    private val terminated = Synchronized(false)
 
-    private def request_stop(): Boolean =
-      stop_requested.change_result(requested => (!requested, true))
+    def stopping: Boolean = stop_request.value.isDefined
 
-    def phase: Phase = if (stop_requested.value) Phase.Stopping
-      else session_future.peek match {
-        case None => if (built.value) Phase.Starting else Phase.Building
-        case Some(Exn.Res(_)) => Phase.Running
-        case Some(Exn.Exn(_)) => Phase.Stopping // a failed start automatically stops
-      }
+    def request_stop(progress: Progress): Unit = {
+      stop_request.change(_.orElse(Some(progress)))
+      start_progress.stop()
+    }
+    def stop(): Unit = request_stop(base_progress)
+
+    def phase: Phase = if (stopping) Phase.Stopping
+      else if (started.is_finished) Phase.Running
+      else if (built.value) Phase.Starting
+      else Phase.Building
 
     def running: Option[PIDE_AI_Session] =
-      if (phase == Phase.Running) session_future.peek.collect { case Exn.Res(session) => session }
-      else None
+      if (stopping) None else started.peek.collect { case Exn.Res(session) => session }
 
-    private def shutdown(session: PIDE_AI_Session, progress: Progress): Unit = {
-      Exn.capture { log(s"Stopping PIDE session ${quote(id)}...") }
-      for (consumer <- phase_consumer.change_result(consumer => (consumer, None)))
-        session.session.phase_changed -= consumer
-      PIDE_AI_Util.release_combined(List(
-        Exn.capture {
-          hooks.stopping(
-            PIDE_AI_Sessions.Session_Event(session, new Unstoppable_Progress(progress)))
-        },
-        Exn.capture { Isabelle_Thread.perhaps_uninterruptible { session.stop() } } match {
-          case Exn.Res(process_result) =>
-            if (!process_result.ok) Exn.capture {
-              log.error_message(s"PIDE session ${quote(id)} stopped with " +
-                PIDE_AI_Util.print_process_result(process_result))
-            }
-            Exn.Res(())
-          case Exn.Exn(exn) if !Exn.is_interrupt(exn) =>
-            Exn.Exn(ERROR(s"Error stopping PIDE session ${quote(id)}: ${Exn.message(exn)}"))
-          case Exn.Exn(exn) => Exn.Exn(exn)
-        }))
+    private def shutdown(session: Option[PIDE_AI_Session], progress: Progress): Exn.Result[Unit] = {
+      val result = Exn.capture {
+        for (session <- session) {
+          Exn.capture { log(s"Stopping PIDE session ${quote(id)}...") }
+          PIDE_AI_Util.release_combined(List(
+            Exn.capture {
+              hooks.stopping(
+                PIDE_AI_Sessions.Session_Event(session, new Unstoppable_Progress(progress)))
+            },
+            Exn.capture { Isabelle_Thread.perhaps_uninterruptible { session.stop() } } match {
+              case Exn.Res(process_result) =>
+                if (!process_result.ok) Exn.capture {
+                  log.error_message(s"PIDE session ${quote(id)} stopped with " +
+                    PIDE_AI_Util.print_process_result(process_result))
+                }
+                Exn.Res(())
+              case Exn.Exn(exn) if !Exn.is_interrupt(exn) =>
+                Exn.Exn(ERROR(s"Error stopping PIDE session ${quote(id)}: ${Exn.message(exn)}"))
+              case Exn.Exn(exn) => Exn.Exn(exn)
+            }))
+        }
+      }
+      state.change(_ - id)
+      result
     }
 
-    def start(): PIDE_AI_Session = {
-      val started_before = start_thread.change_result {
-        case None => (false, Some(Thread.currentThread().nn))
-        case starter => (true, starter)
-      }
-      if (started_before) error(s"PIDE session ${quote(id)} was already started")
-      var started: Option[PIDE_AI_Session] = None
-      try {
+    def run(): Unit = {
+      def stopped_during_startup: Throwable =
+        ERROR(s"Session ${quote(id)} was stopped during startup")
+      var created: Option[PIDE_AI_Session] = None
+      val start_result = Exn.capture {
         log(s"Starting PIDE session ${quote(id)} " +
           s"with base session ${quote(spec.logic)}...")
         start_progress.expose_interrupt()
@@ -129,60 +130,45 @@ class PIDE_AI_Sessions(
         start_progress.expose_interrupt()
         val session =
           PIDE_AI_Session(spec, session_options, session_background, log, start_progress)
-        started = Some(session)
+        created = Some(session)
         val consumer = Session.Consumer[Session.Phase](this.class_name) {
-          case Session.Terminated(result) if !stop_requested.value =>
+          case Session.Terminated(result) if !stopping =>
             Exn.capture {
               log.error_message(s"PIDE session ${quote(id)} terminated unexpectedly: " +
                 PIDE_AI_Util.print_process_result(result))
             }
-            Isabelle_Thread.fork(name = "pide_ai_stop_" + id) {
-              PIDE_AI_Util.log_failure(log, s"Stopping terminated PIDE session ${quote(id)}",
-                Exn.capture { stop(base_progress) })
-            }
+            terminated.change(_ => true)
+            stop()
           case _ =>
         }
-        phase_consumer.change(_ => Some(consumer))
         session.session.phase_changed += consumer
         consumer.consume(session.session.phase) // session might have stopped already
         start_progress.expose_interrupt()
         log(s"PIDE session ${quote(id)} started")
         hooks.started(PIDE_AI_Sessions.Session_Event(session, start_progress))
-        if (stop_requested.value || !session.session.is_ready)
-          error(s"PIDE session ${quote(id)} was stopped during startup")
-        session_future.fulfill(session)
+        if (stopping || !session.session.is_ready) throw stopped_during_startup
         session
       }
-      catch {
-        case exn: Throwable =>
-          val is_owner = request_stop()
-          val shutdown_result =
-            try { Exn.capture { started.foreach(shutdown(_, start_progress)) } }
-            finally { remove_session(id) }
-          if (is_owner) stopped.fulfill_result(shutdown_result)
-          val start_failure =
-            if (!is_owner && Exn.is_interrupt(exn))
-              ERROR(s"PIDE session ${quote(id)} was stopped during startup")
-            else exn
-          val failure = PIDE_AI_Util.combined_failure(start_failure,
-            List(shutdown_result).collect(Exn.the_exn))
-          session_future.fulfill_result(Exn.Exn(failure))
-          throw failure
-      }
-    }
-
-    def stop(progress: Progress): Unit = {
-      if (request_stop()) stopped.fulfill_result(Exn.capture {
-        start_progress.stop()
-        if (!start_thread.value.contains(Thread.currentThread().nn) || session_future.is_finished)
-          session_future.join_result match {
-            case Exn.Exn(_) =>
-            case Exn.Res(session) =>
-              try { shutdown(session, progress) }
-              finally { remove_session(id) }
+      start_result match {
+        case Exn.Res(session) =>
+          started.fulfill(session)
+          val progress = stop_request.guarded_access(request => request.map((_, request)))
+          val result = shutdown(created, progress)
+          if (terminated.value) PIDE_AI_Util.log_failure(log,
+            s"Stopping terminated PIDE session ${quote(id)}", result)
+          else Exn.release(result)
+        case Exn.Exn(exn) =>
+          val progress = stop_request.change_result { request =>
+            val progress = request.getOrElse(start_progress)
+            (progress, Some(progress))
           }
-      })
-      stopped.join
+          val shutdown_result = shutdown(created, progress)
+          val start_failure =
+            if (Exn.is_interrupt(exn) && !caller_progress.stopped) stopped_during_startup
+            else exn
+          started.fulfill_result(Exn.Exn(PIDE_AI_Util.combined_failure(start_failure,
+            List(shutdown_result).collect(Exn.the_exn))))
+      }
     }
   }
 
@@ -197,10 +183,12 @@ class PIDE_AI_Sessions(
         error(s"Session id ${quote(session_id)} is already used")
       else {
         val entry = new Entry(session_id, spec.copy(id = Some(session_id)), progress)
-        (entry, entries + (session_id -> entry))
+        val forked = Task.fork("pide_ai_session_" + session_id, entry)
+        (entry, entries + (session_id -> (entry, forked)))
       }
     }
-    entry.start()
+    try { entry.started.join }
+    catch { case exn: Throwable if Exn.is_interrupt(exn) => entry.stop(); throw exn }
   }
 
   def stop_sessions(session_ids: Option[List[String]], progress: Progress): List[String] = {
@@ -208,11 +196,13 @@ class PIDE_AI_Sessions(
     val selected = session_ids match {
       case None => entries.toList
       case Some(ids) =>
-        val stoppable = entries.toList.filter { case (_, entry) => entry.phase != Phase.Stopping }
+        val stoppable = entries.toList.filter { case (_, (entry, _)) => !entry.stopping }
         select(entries, "stoppable", stoppable, Some(ids.distinct))
     }
-    PIDE_AI_Util.release_combined(
-      selected.map { case (_, entry) => Exn.capture { entry.stop(progress) } })
+    for ((_, (entry, _)) <- selected) entry.request_stop(progress)
+    PIDE_AI_Util.release_combined(selected.map { case (_, (_, forked)) =>
+      if (forked.thread eq Thread.currentThread()) Exn.Res(()) else forked.join_result
+    })
     selected.map(_._1)
   }
 }
