@@ -222,16 +222,15 @@ object PIDE_AI_Document_Command {
     def is_ignorable_for_good: Boolean = is_ignorable_now && command_status.is_terminated
 
     def json(doc: Line.Document, details: Set[State.Detail], cwd: Option[Path]): JSON.Object.T = {
-      lazy val source_line = doc.position(range.start).line1
-      lazy val source = range.substring(snapshot.node.source).stripLineEnd
+      val (start_line, end_line) = PIDE_AI_Util.range_lines(doc, range)
       val entries: List[Option[JSON.Object.Entry]] = List(
         proper_list(status.map(_.name)).map("status" -> _),
         Option.when(timing_ms > 0)("timing_ms" -> timing_ms),
         Some(
           if (details(State.Detail.src))
-            "src" -> PIDE_AI_Util.numbered_lines(source, source_line)
-          else "lines" -> PIDE_AI_Util.line_range(source_line,
-            doc.position(range.start + source.length).line1)),
+            "src" -> PIDE_AI_Util.numbered_lines(
+              range.substring(snapshot.node.source).stripLineEnd, start_line)
+          else "lines" -> PIDE_AI_Util.line_range(start_line, end_line)),
         proper_list(bad_json(doc)).map(PIDE_AI_Document_Command.bad -> _)) :::
         PIDE_AI_Message.messages_json(messages_by_kind,
           PIDE_AI_Message.Message_Kind.values.toList.filter(kind =>

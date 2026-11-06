@@ -65,8 +65,7 @@ object Edit_Tool {
       val edited_doc = Line.Document(computed_text)
       val edited_lines = replaced_ranges.zipWithIndex.map { case (range, i) =>
         val start = range.start + i * (new_text.length - range.length)
-        val line_range = edited_doc.range(Text.Range(start, start + new_text.length))
-        (line_range.start.line1, line_range.stop.line1)
+        PIDE_AI_Util.range_lines(edited_doc, Text.Range(start, start + new_text.length))
       }
       progress.expose_interrupt()
       if (changed) session.write_file_content(node_name.path, computed_text)

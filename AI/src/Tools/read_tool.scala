@@ -29,9 +29,9 @@ class Read_Tool extends PIDE_AI_Tool("read") {
       PIDE_AI_Util.check_ordered_lines(start_line, opt_end_line)
       val text = session.read_update_resolve(node_name, List((start_line, opt_end_line)),
         await_stable_before_resolve = true, hide_others = true, progress = progress)
-      val (_, end_line) = PIDE_AI_Util.check_lines(start_line, opt_end_line,
-        Line.Document(text).lines.length)
-      PIDE_AI_Util.numbered_lines_range(text, start_line, end_line)
+      val doc = Line.Document(text)
+      val (_, end_line) = PIDE_AI_Util.check_lines(start_line, opt_end_line, doc.lines.length)
+      PIDE_AI_Util.numbered_lines_range(doc, start_line, end_line)
     }
 }
 

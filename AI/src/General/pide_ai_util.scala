@@ -39,6 +39,9 @@ object PIDE_AI_Util {
     if (start_line - 1 > end_line) None
     else doc.text_range(Line.Range(Line.Position(start_line - 1), Line.Position(end_line)))
 
+  def range_lines(doc: Line.Document, range: Text.Range): (Int, Int) =
+    (doc.position(range.start).line1, doc.position(range.start max (range.stop - 1)).line1)
+
   def check_ordered_lines(start_line: Int, end_line: Option[Int]): Unit =
     for (stop <- end_line if stop < start_line) error(s"end_line $stop < start_line $start_line")
 
@@ -82,19 +85,15 @@ object PIDE_AI_Util {
   def numbered_lines(text: String, start_line: Int): String =
     numbered_lines(Line.logical_lines(text), start_line)
 
-  def numbered_lines_range(lines: List[String], start_line: Int, end_line: Int): String =
-    numbered_lines(lines.slice(start_line - 1, end_line min lines.length), start_line)
-
-  def numbered_lines_range(text: String, start_line: Int, end_line: Int): String =
-    numbered_lines_range(Line.logical_lines(text), start_line, end_line)
+  def numbered_lines_range(doc: Line.Document, start_line: Int, end_line: Int): String =
+    numbered_lines(doc.lines.iterator.slice(start_line - 1, end_line).map(_.text), start_line)
 
   def snippet(doc: Line.Document, range: Text.Range, snippet_lines: Int): String = {
-    val start = doc.position(range.start).line1
-    val (shown, rest) = Line.logical_lines(range.substring(doc.text).stripLineEnd)
-      .splitAt(snippet_lines)
-    val omitted = Option.when(rest.nonEmpty)(
-      line_range(start + shown.length, start + shown.length + rest.length - 1) + ": ...")
-    cat_lines(proper_string(numbered_lines(shown, start)).toList ::: omitted.toList)
+    val (start, stop) = range_lines(doc, range)
+    val end = stop min (start + snippet_lines - 1)
+    val shown = numbered_lines_range(doc, start, end)
+    val omitted = Option.when(end < stop)(line_range(end + 1, stop) + ": ...")
+    cat_lines(proper_string(shown).toList ::: omitted.toList)
   }
 
   def print_process_result(process_result: Process_Result): String =

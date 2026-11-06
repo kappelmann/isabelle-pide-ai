@@ -35,10 +35,9 @@ object PIDE_AI_Definition {
     filter_node_names: Option[Set[Document.Node.Name]],
     def_entry_not_loaded: String
   ) {
-    private val cache = mutable.Map.empty[Document.Node.Name, List[String]]
-    def lines(node_name: Document.Node.Name): List[String] =
-      cache.getOrElseUpdate(node_name,
-        Line.logical_lines(session.node_source(snapshot, node_name)))
+    private val cache = mutable.Map.empty[Document.Node.Name, Line.Document]
+    def doc(node_name: Document.Node.Name): Line.Document =
+      cache.getOrElseUpdate(node_name, Line.Document(session.node_source(snapshot, node_name)))
 
     def resolved(
       name_space_entry: Name_Space.Entry,
@@ -48,7 +47,7 @@ object PIDE_AI_Definition {
     ): PIDE_AI_Definition = PIDE_AI_Definition(name, name_space_entry.kind,
       def_label(name_space_entry, session.unicode_symbols), location = Some(Right(node_name)),
       line = Some(line), snippet = Option.when(snippet_lines > 0)(
-        PIDE_AI_Util.numbered_lines_range(lines(node_name), line, line + snippet_lines - 1)))
+        PIDE_AI_Util.numbered_lines_range(doc(node_name), line, line + snippet_lines - 1)))
 
     def resolve(name_space_entry: Name_Space.Entry, name: String): Option[PIDE_AI_Definition] = {
       def resolve_at(source_name: String, line: Int): Option[PIDE_AI_Definition] =
