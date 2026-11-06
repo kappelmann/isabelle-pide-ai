@@ -63,14 +63,17 @@ class Sledgehammer_Tool extends PIDE_AI_Tool("sledgehammer") with PIDE_AI_Tool.R
   def handle(
     server: PIDE_AI_Server,
     args: JSON.Object.T,
-    progress: Progress
+    progress: Progress,
+    context: PIDE_AI_Client_Context
   ): PIDE_AI_Tool_Result =
     PIDE_AI_Tool_Result.result {
+      val cwd = context.cwd
       val session = PIDE_AI_Tool_Util.running_session_param(server.sessions, args)
-      val node_name = PIDE_AI_Tool_Util.origin_param(session, args)
-      val snapshot = PIDE_AI_Tool_Util.require_stable_origin_snapshot(session, node_name, progress)
+      val node_name = PIDE_AI_Tool_Util.origin_param(session, args, cwd)
+      val snapshot =
+        PIDE_AI_Tool_Util.require_stable_node_snapshot(session, node_name, progress, cwd)
       val line = line_arg.get(args)
-      val context = PIDE_AI_Editor.Context(node_name,
+      val editor_context = PIDE_AI_Editor.Context(node_name,
         caret_offset(snapshot.node.source, line,
           prefix_arg.get(args).map(session.pide_text(node_name.path, _))))
       val provers = provers_arg.get(args).getOrElse(
@@ -78,10 +81,10 @@ class Sledgehammer_Tool extends PIDE_AI_Tool("sledgehammer") with PIDE_AI_Tool.R
       val query_args = List(provers,
         Value.Boolean(isar_proofs_arg.get(args)), Value.Boolean(try0_arg.get(args)))
       val proofs_limit = proofs_limit_arg.get(args)
-      new PIDE_AI_Query(session, context, "sledgehammer", progress)
+      new PIDE_AI_Query(session, editor_context, "sledgehammer", progress, cwd)
         .run(query_args, timeout_arg.get(args),
           stop = output => proofs_count(output) >= proofs_limit)
-        .json(PIDE_AI_Message.Message_Kind.values.toList)
+        .json(PIDE_AI_Message.Message_Kind.values.toList, cwd)
     }
 }
 

@@ -52,7 +52,8 @@ with PIDE_AI_Tool.Read_Only {
   def handle(
     server: PIDE_AI_Server,
     args: JSON.Object.T,
-    progress: Progress
+    progress: Progress,
+    context: PIDE_AI_Client_Context
   ): PIDE_AI_Tool_Result =
     PIDE_AI_Tool_Result.result {
       val selected_sessions = PIDE_AI_Tool_Util.running_sessions_param(server.sessions, args)
@@ -71,7 +72,8 @@ with PIDE_AI_Tool.Read_Only {
         options = include_options_arg.get(args),
         statistics = include_statistics_arg.get(args))
       JSON_Object("sessions" -> selected_sessions.map(session =>
-        PIDE_AI_Session_State.json(session, filter_origins.get(session.id), include))) ++
+        PIDE_AI_Session_State.json(session, filter_origins.get(session.id), include,
+          context.cwd))) ++
       JSON_Object.if_proper(include.statistics,
         PIDE_AI_Session_State.jvm_stats_json())
     }

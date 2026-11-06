@@ -9,6 +9,7 @@ import isabelle._
 class PIDE_AI_Stdio_Connector(
   server: PIDE_AI_Server,
   protocol: PIDE_AI_Protocol,
+  context: PIDE_AI_Client_Context,
   log: Logger,
   message_log: Logger,
   on_client_closed: PIDE_AI_Client_Handler[Stdio_Connection] => Unit = _ => ()
@@ -22,8 +23,10 @@ class PIDE_AI_Stdio_Connector(
     Option.when(pending.change_result(pending => (pending, false)))(
       new Stdio_Connection(message_log))
 
-  def connection_protocol(connection: Stdio_Connection): Option[PIDE_AI_Protocol] =
-    Some(protocol)
+  def connection_header(
+    connection: Stdio_Connection
+  ): Option[(PIDE_AI_Protocol, PIDE_AI_Client_Context)] =
+    Some((protocol, context))
 
   def accepting_connections: Boolean = pending.value
   def stop_accepting_connections(): Unit = pending.change(_ => false)

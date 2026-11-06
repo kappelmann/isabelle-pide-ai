@@ -21,7 +21,7 @@ JSON="${JSON//$'\r'/}"
 JSON="${JSON//$'\n'/ }"
 
 exec 3<>"/dev/tcp/127.0.0.1/$PORT" || exit 2
-printf 'cmd\n%s %s\n' "$TOOL" "$JSON" >&3
+printf 'cmd %s\n%s %s\n' "$PWD" "$TOOL" "$JSON" >&3
 IFS= read -r FIRST <&3
 if [ "$FIRST" != OK ]; then
   [ -z "$FIRST" ] || printf '%s\n' "$FIRST"

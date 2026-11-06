@@ -77,11 +77,18 @@ object PIDE_AI_Document_Command {
 
   private val here: String = Symbol.decode("\\<^here>")
 
-  def resolve_positions(snapshot: Document.Snapshot, cmd: Command, body: XML.Body): XML.Body = {
+  def resolve_positions(
+    snapshot: Document.Snapshot,
+    cmd: Command,
+    body: XML.Body,
+    cwd: Option[Path]
+  ): XML.Body = {
     def same_file(file: String): Boolean = file == snapshot.node_name.node ||
-      Path.is_valid(file) && Path.explode(file).expand.implode == snapshot.node_name.node
+      PIDE_AI_Util.absolute_file(file).exists(
+        PIDE_AI_Util.absolute_file(snapshot.node_name.node).contains)
     def line_text(line: Int, file: String): String =
-      "(line " + line + if_proper(!same_file(file), " of " + quote(file)) + ")"
+      "(line " + line +
+        if_proper(!same_file(file), " of " + quote(PIDE_AI_Util.print_file(file, cwd))) + ")"
     body.flatMap {
       case XML.Elem(Markup(Markup.POSITION, Position.Item_Id(id, range)), List(XML.Text(text)))
       if Symbol.decode(text) == here => if (self_id(snapshot.state, cmd)(id)) Nil
@@ -91,7 +98,7 @@ object PIDE_AI_Document_Command {
       if Position.File.unapply(props).exists(same_file) =>
         List(XML.Elem(markup, XML.string(line_text(line, snapshot.node_name.node))))
       case XML.Elem(markup, body1) =>
-        List(XML.Elem(markup, resolve_positions(snapshot, cmd, body1)))
+        List(XML.Elem(markup, resolve_positions(snapshot, cmd, body1, cwd)))
       case text => List(text)
     }
   }
@@ -141,16 +148,16 @@ object PIDE_AI_Document_Command {
         case Problem.message(msg) => msg.ranges
       }
 
-    def text: Option[String] =
+    def text(cwd: Option[Path]): Option[String] =
       this match {
         case Problem.status(_, _, _) => None
         case Problem.bad(info) => proper_string(info.info)
-        case Problem.message(msg) => proper_string(msg.text)
+        case Problem.message(msg) => proper_string(msg.text(cwd))
       }
 
-    def json(doc: Line.Document, snippet_lines: Int): JSON.Object.T =
+    def json(doc: Line.Document, snippet_lines: Int, cwd: Option[Path]): JSON.Object.T =
       JSON_Object("snippets" -> ranges.map(PIDE_AI_Util.snippet(doc, _, snippet_lines))) ++
-      JSON.optional("message" -> text) ++
+      JSON.optional("message" -> text(cwd)) ++
       JSON.optional("timing_ms" -> Some(this).collect {
         case Problem.status(Status.running, _, timing_ms) => timing_ms
       })
@@ -214,7 +221,7 @@ object PIDE_AI_Document_Command {
     def is_ignorable_now: Boolean = cmd.is_ignored && messages.isEmpty && problems.isEmpty
     def is_ignorable_for_good: Boolean = is_ignorable_now && command_status.is_terminated
 
-    def json(doc: Line.Document, details: Set[State.Detail]): JSON.Object.T = {
+    def json(doc: Line.Document, details: Set[State.Detail], cwd: Option[Path]): JSON.Object.T = {
       lazy val source_line = doc.position(range.start).line1
       lazy val source = range.substring(snapshot.node.source).stripLineEnd
       val entries: List[Option[JSON.Object.Entry]] = List(
@@ -228,7 +235,7 @@ object PIDE_AI_Document_Command {
         proper_list(bad_json(doc)).map(PIDE_AI_Document_Command.bad -> _)) :::
         PIDE_AI_Message.messages_json(messages_by_kind,
           PIDE_AI_Message.Message_Kind.values.toList.filter(kind =>
-            details(State.Detail.of(kind)))) :::
+            details(State.Detail.of(kind))), cwd) :::
         List(
           Option.when(details(State.Detail.types))(
             proper_list(PIDE_AI_Markup.types_json(snapshot, range, unicode_symbols))
@@ -302,9 +309,14 @@ object PIDE_AI_Document_Command {
       occurrences_limit: Option[Int],
       snippet_lines: Int)
 
-    def json(states: Iterator[State], doc: Line.Document, report: Report): JSON.Object.T = {
+    def json(
+      states: Iterator[State],
+      doc: Line.Document,
+      report: Report,
+      cwd: Option[Path]
+    ): JSON.Object.T = {
       def redundant_problem(state: State, problem: Problem): Boolean =
-        problem.text.isEmpty && problem.message_kind.exists(state.messages_of(_).nonEmpty)
+        problem.text(cwd).isEmpty && problem.message_kind.exists(state.messages_of(_).nonEmpty)
       val counts = mutable.Map[String, Int]().withDefaultValue(0)
       val occurrences = mutable.Map[String, mutable.ListBuffer[JSON.Object.T]]()
       val returned_commands = new mutable.ListBuffer[JSON.Object.T]
@@ -325,19 +337,19 @@ object PIDE_AI_Document_Command {
           if (report.occurrences_limit.forall(count_listed_occurrences < _) &&
               !redundant_problem(state, problem)) {
             occurrences.getOrElseUpdate(problem.key, new mutable.ListBuffer[JSON.Object.T]) +=
-              problem.json(doc, report.snippet_lines)
+              problem.json(doc, report.snippet_lines, cwd)
             count_listed_occurrences += 1
           }
         }
         if (include_details) {
           if (problems.nonEmpty) {
             if (report.problematic_limit.forall(count_problematic < _))
-              returned_commands += state.json(doc, report.details)
+              returned_commands += state.json(doc, report.details, cwd)
             count_problematic += 1
           }
           else {
             if (report.unproblematic_limit.forall(count_unproblematic < _))
-              returned_commands += state.json(doc, report.details)
+              returned_commands += state.json(doc, report.details, cwd)
             count_unproblematic += 1
           }
         }

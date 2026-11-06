@@ -11,8 +11,9 @@ import isabelle._
 abstract class PIDE_AI_Tool_Endpoint(
   server: PIDE_AI_Server,
   connection: Line_Connection,
+  context: PIDE_AI_Client_Context,
   log: Logger
-) extends PIDE_AI_Endpoint(server, connection) {
+) extends PIDE_AI_Endpoint(server, connection, context) {
   def tool_not_found(id: String): String = s"Tool not found: ${quote(id)}"
 
   val tool_call_scope = new Task_Scope[PIDE_AI_Tool_Call]
@@ -31,7 +32,7 @@ abstract class PIDE_AI_Tool_Endpoint(
           serial += 1
           report(serial, message.message.output_text)
         })
-    val call = new PIDE_AI_Tool_Call(server, tool, args, progress, log)
+    val call = new PIDE_AI_Tool_Call(server, tool, args, progress, log, context)
     tool_call_scope.fork("pide_ai_tool_call", call, on_finish = { result =>
       progress.stop_reporting()
       for (tool_result <- Exn.the_res.lift(result)) {

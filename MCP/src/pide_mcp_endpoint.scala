@@ -13,8 +13,12 @@ object PIDE_MCP_Endpoint {
   val instructions = "Interactive, multi-session proof development with Isabelle."
 }
 
-class PIDE_MCP_Endpoint(server: PIDE_AI_Server, connection: Line_Connection, log: Logger)
-extends PIDE_AI_Tool_Endpoint(server, connection, log) {
+class PIDE_MCP_Endpoint(
+  server: PIDE_AI_Server,
+  connection: Line_Connection,
+  context: PIDE_AI_Client_Context,
+  log: Logger
+) extends PIDE_AI_Tool_Endpoint(server, connection, context, log) {
   private def respond(body: JSON.Object.T): Unit = connection.write_line(JSON.Format(body))
 
   private def respond_error(id: JSON_RPC.Id | Null, code: Int, message: String): Unit =

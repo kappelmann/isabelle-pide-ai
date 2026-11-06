@@ -18,10 +18,11 @@ object Start_Session_Tool extends PIDE_AI_Tool("start_session") {
   def handle(
     server: PIDE_AI_Server,
     args: JSON.Object.T,
-    progress: Progress
+    progress: Progress,
+    context: PIDE_AI_Client_Context
   ): PIDE_AI_Tool_Result =
     PIDE_AI_Tool_Result.result {
-      val spec = PIDE_AI_Session_Spec.from_json(args)
+      val spec = PIDE_AI_Session_Spec.from_json(args, context.cwd)
       val session =
         server.sessions.start_session_reporting_build_status(Options.init(), spec, progress)
       JSON_Object("session" -> session.id)

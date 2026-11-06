@@ -11,7 +11,6 @@ import isabelle._
 object PIDE_AI_Session_Spec {
   def default_logic(): String = Isabelle_System.default_logic()
 
-  def dir(s: String): Path = PIDE_AI_Util.path(s)
   def option(s: String): Options.Spec = Options.Spec.make(s)
 
   private val default_spec: PIDE_AI_Session_Spec = PIDE_AI_Session_Spec()
@@ -43,12 +42,12 @@ object PIDE_AI_Session_Spec {
       current = Some(f(current.getOrElse(default_spec)))
     private def update_session(f: PIDE_AI_Session_Spec => PIDE_AI_Session_Spec): Unit =
       { session_option = true; update(f) }
-    val option_specs: List[(String, String => Unit)] =
+    def option_specs(cwd: Option[Path]): List[(String, String => Unit)] =
       List(
         "A:" -> (arg => update_session(_.copy(session_ancestor = Some(arg)))),
         "R:" -> (arg => update_session(_.copy(logic = arg, session_requirements = true))),
-        "d:" -> (arg =>
-          update_session(spec => spec.copy(dirs = spec.dirs ::: List(dir(arg))))),
+        "d:" -> (arg => update_session(spec =>
+          spec.copy(dirs = spec.dirs ::: List(PIDE_AI_Util.path(arg, cwd))))),
         "f" -> (_ => update_session(_.copy(fresh_build = true))),
         "l:" -> (arg => update_session(_.copy(logic = arg))),
         "n" -> (_ => update_session(_.copy(no_build = true))),
@@ -57,18 +56,17 @@ object PIDE_AI_Session_Spec {
         "z:" -> (arg => update_session(_.copy(id = Some(arg)))))
   }
 
-  def parse(spec: String): PIDE_AI_Session_Spec = {
+  def parse(spec: String, cwd: Option[Path]): PIDE_AI_Session_Spec = {
     val words = Parsers.parseAll(Parsers.words, spec) match {
       case Parsers.Success(res, _) => res
       case bad => cat_error(bad.toString, usage)
     }
     val builder = new Builder
-    val more_args = Getopts(usage, builder.option_specs: _*)(words, true)
+    val more_args = Getopts(usage, builder.option_specs(cwd): _*)(words, true)
     if (more_args.nonEmpty) cat_error("Bad session options: " + quote(spec), usage)
     builder.spec.getOrElse(default_spec)
   }
 
-  val dir_format: JSON_Schema.Format[Path] = JSON_Schema.Format.string.map(dir, _.absolute.implode)
   val option_format: JSON_Schema.Format[Options.Spec] =
     JSON_Schema.Format.string.map(option, _.toString)
 
@@ -79,7 +77,7 @@ object PIDE_AI_Session_Spec {
     "logic", "Session to work with.", JSON_Schema.Format.string, default_spec.logic)
   val dirs_arg = JSON_Schema.Arg.default(
     "dirs", "Included directories.",
-    JSON_Schema.Format.list(dir_format), default_spec.dirs)
+    JSON_Schema.Format.list(JSON_Schema.Format.string), default_spec.dirs.map(_.implode))
   val options_arg = JSON_Schema.Arg.default(
     "options",
     s"System options to override, each as ${quote("NAME=VAL")} or ${quote("NAME")}.",
@@ -105,11 +103,11 @@ object PIDE_AI_Session_Spec {
     List(session_arg, logic_arg, dirs_arg, options_arg, session_ancestor_arg,
       session_requirements_arg, fresh_build_arg, no_build_arg)
 
-  def from_json(args: JSON.Object.T): PIDE_AI_Session_Spec =
+  def from_json(args: JSON.Object.T, cwd: Option[Path]): PIDE_AI_Session_Spec =
     PIDE_AI_Session_Spec(
       logic = logic_arg.get(args),
       id = session_arg.get(args),
-      dirs = dirs_arg.get(args),
+      dirs = dirs_arg.get(args).map(PIDE_AI_Util.path(_, cwd)),
       options = options_arg.get(args),
       session_ancestor = session_ancestor_arg.get(args),
       session_requirements = session_requirements_arg.get(args),
@@ -130,7 +128,7 @@ sealed case class PIDE_AI_Session_Spec(
   def json: JSON.Object.T =
     PIDE_AI_Session_Spec.session_arg(id) ++
     PIDE_AI_Session_Spec.logic_arg(logic) ++
-    PIDE_AI_Session_Spec.dirs_arg(dirs) ++
+    PIDE_AI_Session_Spec.dirs_arg(dirs.map(_.implode)) ++
     PIDE_AI_Session_Spec.options_arg(options) ++
     PIDE_AI_Session_Spec.session_ancestor_arg(session_ancestor) ++
     PIDE_AI_Session_Spec.session_requirements_arg(session_requirements) ++

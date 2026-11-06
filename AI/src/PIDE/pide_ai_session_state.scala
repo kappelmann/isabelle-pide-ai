@@ -116,27 +116,28 @@ object PIDE_AI_Session_State {
   def json(
     session: PIDE_AI_Session,
     origins: Option[List[String]],
-    include: Include
+    include: Include,
+    cwd: Option[Path]
   ): JSON.Object.T = {
     lazy val snapshot = session.snapshot()
     lazy val theories = PIDE_AI_Theory.Loaded(session, snapshot.version.nodes)
     lazy val names = origins match {
       case None => theories.dynamic
       case Some(origins) =>
-        val selected = origins.map(origin => session.origin(session.node_name(origin))).toSet
-        theories.dynamic.filter(name => selected.contains(session.origin(name)))
+        val selected = origins.map(session.node_name(_, cwd)).toSet
+        theories.dynamic.filter(selected.contains)
     }
     JSON_Object("session" -> session.id, "base_session" -> session.base_session) ++
     JSON.optional(PIDE_AI_Document_Command.Status.key(PIDE_AI_Document_Command.Status.running.name) ->
       Option.when(include.cmds_processing) {
-        PIDE_AI_Theory.commands_running_json(session, snapshot, names)
+        PIDE_AI_Theory.commands_running_json(session, snapshot, names, cwd)
       }.filter(_.nonEmpty)) ++
     JSON_Object.if_proper(include.thy_status,
-      PIDE_AI_Theory.Status.statuses_json(
-        PIDE_AI_Theory.Status.statuses(session, snapshot, names))) ++
-    JSON.optional("loaded_thys" -> Option.when(include.loaded_thys)(theories.json)) ++
-    JSON.optional("session_dirs" ->
-      Option.when(include.session_dirs)(session.directories().map(_.implode))) ++
+      PIDE_AI_Theory.Status.statuses_json(session,
+        PIDE_AI_Theory.Status.statuses(session, snapshot, names), cwd)) ++
+    JSON.optional("loaded_thys" -> Option.when(include.loaded_thys)(theories.json(cwd))) ++
+    JSON.optional("session_dirs" -> Option.when(include.session_dirs)(
+      session.directories().map(PIDE_AI_Util.print_path(_, cwd)))) ++
     options_json(include.options, session.options) ++
     JSON_Object.if_proper(include.statistics, {
       val statistics = session.runtime_statistics()

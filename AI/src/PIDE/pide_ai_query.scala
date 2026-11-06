@@ -24,10 +24,10 @@ object PIDE_AI_Query {
             unicode_symbols)))
     }
 
-    def json(kinds: List[PIDE_AI_Message.Message_Kind]): JSON.Object.T =
+    def json(kinds: List[PIDE_AI_Message.Message_Kind], cwd: Option[Path]): JSON.Object.T =
       JSON_Object.flatten(
         List(Some("status" -> outcome.toString), Some("elapsed_ms" -> elapsed.ms)) :::
-        PIDE_AI_Message.messages_json(messages.groupBy(_.kind), kinds))
+        PIDE_AI_Message.messages_json(messages.groupBy(_.kind), kinds, cwd))
   }
 }
 
@@ -35,7 +35,8 @@ class PIDE_AI_Query(
   session: PIDE_AI_Session,
   context: PIDE_AI_Editor.Context,
   operation: String,
-  progress: Progress
+  progress: Progress,
+  cwd: Option[Path]
 ) {
   private val editor = session.editor(progress)
   private val status = Synchronized(Query_Operation.Status.waiting)
@@ -50,13 +51,17 @@ class PIDE_AI_Query(
         else progress.echo(text)
       })
 
-  private def origin: String = quote(session.origin(context.node_name))
+  private def origin: String = quote(session.print_origin(context.node_name, cwd))
 
   def finished: Boolean = status.value == Query_Operation.Status.finished
 
+  def require_snapshot(): Document.Snapshot =
+    editor.current_node_snapshot(context).getOrElse(
+      error(s"No PIDE snapshot available for $origin"))
+
   private def require_command(): Unit =
     for (command <- query.get_location)
-      if (!session.node_snapshot(command.node_name).node.commands.contains(command))
+      if (!require_snapshot().node.commands.contains(command))
         error(s"The command of the $operation query in $origin is gone")
 
   def run(
@@ -66,9 +71,7 @@ class PIDE_AI_Query(
   ): PIDE_AI_Query.Result = {
     if (session.is_base_session_theory(context.node_name))
       error(s"Cannot query base session theory $origin")
-    val snapshot = editor.current_node_snapshot(context).getOrElse(
-      error(s"No PIDE snapshot available for $origin"))
-    if (editor.current_command(context, snapshot).isEmpty)
+    if (editor.current_command(context, require_snapshot()).isEmpty)
       error(s"No command at the given position of $origin")
 
     val start = Time.now()

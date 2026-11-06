@@ -11,14 +11,15 @@ class PIDE_AI_Tool_Call(
   tool: PIDE_AI_Tool,
   args: JSON.Object.T,
   progress: Progress,
-  log: Logger
+  log: Logger,
+  context: PIDE_AI_Client_Context
 ) extends Progress_Task[PIDE_AI_Tool_Result](progress) {
   def run(): PIDE_AI_Tool_Result =
     Exn.capture {
       progress.expose_interrupt()
       PIDE_AI_Tool_Result.result(tool.check_args(args)) match {
         case Result.Error(error) => Result.Error(error)
-        case Result.Res(_) => tool.handle(server, args, progress)
+        case Result.Res(_) => tool.handle(server, args, progress, context)
       }
     } match {
       case Exn.Res(result) => result

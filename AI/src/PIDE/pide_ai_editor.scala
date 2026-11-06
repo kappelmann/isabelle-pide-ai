@@ -12,9 +12,9 @@ object PIDE_AI_Editor {
 
 class PIDE_AI_Editor(mcp_session: PIDE_AI_Session, progress: Progress) extends Editor {
   type Context = PIDE_AI_Editor.Context
-  type Session = Headless.Session
+  type Session = PIDE_AI_Headless.Session
 
-  def session: Headless.Session = mcp_session.session
+  def session: PIDE_AI_Headless.Session = mcp_session.session
   def flush(): Unit = ()
   def invoke(): Unit = ()
   def revoke(): Unit = ()

@@ -57,14 +57,15 @@ class Create_Scratch_Tool extends PIDE_AI_Tool("create_scratch") {
   def handle(
     server: PIDE_AI_Server,
     args: JSON.Object.T,
-    progress: Progress
+    progress: Progress,
+    context: PIDE_AI_Client_Context
   ): PIDE_AI_Tool_Result =
     PIDE_AI_Tool_Result.result {
       val session = PIDE_AI_Tool_Util.running_session_param(server.sessions, args)
       val name_suffix = name_suffix_arg.get(args)
       val extension = extension_arg.get(args)
       val (path, created) = create_scratch(session.id, name_suffix, extension)
-      JSON_Object("path" -> path.implode) ++
+      JSON_Object("path" -> PIDE_AI_Util.print_path(path, context.cwd)) ++
       JSON_Object.if_proper(!created, JSON_Object("note" -> "File already existed."))
     }
 }

@@ -59,24 +59,27 @@ class Find_Entities_Tool extends PIDE_AI_Tool("find_entities") with PIDE_AI_Tool
   def handle(
     server: PIDE_AI_Server,
     args: JSON.Object.T,
-    progress: Progress
+    progress: Progress,
+    context: PIDE_AI_Client_Context
   ): PIDE_AI_Tool_Result =
     PIDE_AI_Tool_Result.result {
+      val cwd = context.cwd
       val session = PIDE_AI_Tool_Util.running_session_param(server.sessions, args)
-      val node_name = PIDE_AI_Tool_Util.origin_param(session, args)
-      val snapshot = PIDE_AI_Tool_Util.require_stable_origin_snapshot(session, node_name, progress)
+      val node_name = PIDE_AI_Tool_Util.origin_param(session, args, cwd)
+      val snapshot =
+        PIDE_AI_Tool_Util.require_stable_node_snapshot(session, node_name, progress, cwd)
       val snippet_lines = snippet_lines_arg.get(args)
-      val filter_origins = filter_origins_arg.get(args)
-        .map(_.map(origin => session.origin(session.node_name(origin))).toSet)
+      val filter_node_names =
+        filter_origins_arg.get(args).map(_.map(session.node_name(_, cwd)).toSet)
       val range = PIDE_AI_Util.check_text_range(Line.Document(snapshot.node.source),
         PIDE_AI_Tool_Schema.start_line_arg.get(args),
         PIDE_AI_Tool_Schema.opt_end_line_arg.get(args))
       val definition_kinds = kinds_arg.get(args).flatMap(_.markups)
       val definitions = PIDE_AI_Definition.definitions(
-        session, snapshot, Some(range), snippet_lines, definition_kinds, filter_origins,
+        session, snapshot, Some(range), snippet_lines, definition_kinds, filter_node_names,
         "The definition entry has not been loaded yet. " +
         PIDE_AI_Tool_Util.retry_soon_message)
-      PIDE_AI_Definition.definitions_json(definitions)
+      PIDE_AI_Definition.definitions_json(session, definitions, cwd)
     }
 }
 

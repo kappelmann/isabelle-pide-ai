@@ -9,6 +9,8 @@ New in this PIDE AI version
 New in PIDE AI 2026
 ----------------------------
 
+* Tool handles now receive the client's context. INCOMPATIBILITY.
+* New client context, including a client's working directory (cwd). Paths are now parsed and printed relative to cwd. INCOMPATIBILITY.
 * Option `pide_ai_long_running_threshold` is split into `pide_ai_build_long_running_threshold` and `pide_ai_log_long_running_threshold` for the server's console and log file. INCOMPATIBILITY.
 * New option `pide_ai_build_report_nodes_status_delay` to set the minimum delay between progress reports of session builds.
 * New option `pide_ai_unicode_symbols` to represent Isabelle symbols in the server via Unicode or ASCII.

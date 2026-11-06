@@ -19,6 +19,7 @@ object PIDE_AI {
     val specs: List[PIDE_AI_Session_Spec],
     val port: Option[Int],
     val progress: Progress,
+    val client_context: PIDE_AI_Client_Context,
     val log: Logger,
     val message_log: Logger
   ) {
@@ -56,7 +57,8 @@ object PIDE_AI {
       def start_session(spec: PIDE_AI_Session_Spec, progress: Progress): Unit = {
         val result =
           try {
-            using(client_connector.connect(PIDE_AI_Command_Protocol)) { connection =>
+            using(client_connector.connect(PIDE_AI_Command_Protocol, client_context)) {
+              connection =>
               val call = Task.close_on_stop(connection, s"server $server", log)(Exn.capture {
                 PIDE_AI_Command_Client.call_tool(connection, Start_Session_Tool.id, spec.json,
                   progress)
@@ -78,7 +80,7 @@ object PIDE_AI {
         log, progress, start_session)
 
       log(s"Proxying ${protocol.id} to server $server...")
-      using(client_connector.connect(protocol)) { server_connection =>
+      using(client_connector.connect(protocol, client_context)) { server_connection =>
         val proxy = new Line_Connection_Proxy(host_connection, server_connection, log)
         try {
           Exn.Interrupt.signal_handler {
@@ -108,6 +110,8 @@ object PIDE_AI {
     var verbose = false
     var log_messages = false
     var port: Option[Int] = None
+    val client_context = PIDE_AI_Client_Context.current_path
+    val cwd = client_context.cwd
     val session_spec = new PIDE_AI_Session_Spec.Builder
 
     val getopts = Getopts("""
@@ -124,13 +128,13 @@ Usage: isabelle """ + name + """ [OPTIONS]
 
   """ + PIDE_AI_Session_Spec.usage + description,
       List(
-        "L:" -> (arg => log_path = Some(PIDE_AI_Util.path(arg))),
+        "L:" -> (arg => log_path = Some(PIDE_AI_Util.path(arg, cwd))),
         "S:" -> (arg =>
-          session_specs = session_specs ::: List(PIDE_AI_Session_Spec.parse(arg))),
+          session_specs = session_specs ::: List(PIDE_AI_Session_Spec.parse(arg, cwd))),
         "p:" -> (arg => port = Some(Value.Int.parse(arg))),
         "v" -> (_ => verbose = true),
         "w" -> (_ => log_messages = true)) :::
-        more_option_specs ::: session_spec.option_specs: _*)
+        more_option_specs ::: session_spec.option_specs(cwd): _*)
 
     val more_args = getopts(args)
     if (more_args.nonEmpty) getopts.usage()
@@ -151,7 +155,7 @@ Usage: isabelle """ + name + """ [OPTIONS]
     val message_log = if (log_messages) log else Logger.none
 
     val result = Exn.capture {
-      run(new Context(options, specs, port, progress, log, message_log))
+      run(new Context(options, specs, port, progress, client_context, log, message_log))
     }
     PIDE_AI_Util.log_failure(log, name, result)
     result match {

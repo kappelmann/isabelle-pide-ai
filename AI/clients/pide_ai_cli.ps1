@@ -20,7 +20,8 @@ try { $client = [System.Net.Sockets.TcpClient]::new('127.0.0.1', $port) }
 catch { [Console]::Error.WriteLine($_.Exception.Message); exit 2 }
 $utf8 = [System.Text.UTF8Encoding]::new($false)
 $stream = $client.GetStream()
-$request = $utf8.GetBytes("cmd`n$tool $json`n")
+$cwd = (Get-Location).ProviderPath
+$request = $utf8.GetBytes("cmd $cwd`n$tool $json`n")
 $stream.Write($request, 0, $request.Length)
 $reader = [System.IO.StreamReader]::new($stream, $utf8)
 $first = $reader.ReadLine()

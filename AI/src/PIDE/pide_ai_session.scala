@@ -63,7 +63,7 @@ object PIDE_AI_Session {
     progress: Progress
   ): PIDE_AI_Session = {
     val id = spec.id.getOrElse(error("Missing session id"))
-    val resources = Headless.Resources(options, session_background, log)
+    val resources = PIDE_AI_Headless.Resources(options, session_background, log)
     progress.expose_interrupt()
     val session = resources.start_session(progress = progress)
     try {
@@ -90,9 +90,9 @@ object PIDE_AI_Session {
 class PIDE_AI_Session private(
   val id: String,
   val dirs: List[Path],
-  val session: Headless.Session
+  val session: PIDE_AI_Headless.Session
 ) {
-  def resources: Headless.Resources = session.resources
+  def resources: PIDE_AI_Headless.Resources = session.resources
   def options: Options = resources.options
   val unicode_symbols: Boolean = PIDE_AI_Session.unicode_symbols(options)
   def disk_text(path: Path, text: String): String =
@@ -146,29 +146,31 @@ class PIDE_AI_Session private(
     Exn.release(result)
   }
 
-  private def path_node_name(path: Path): Document.Node.Name = {
-    val abs = path.canonical
-    resources.find_theory(abs.file).getOrElse { // session theories
-      val candidate = Document.Node.Name(abs.implode, // full path file
-        theory = Thy_Header.theory_name(abs.implode))
-      if (candidate.path.is_file) candidate
-      // source_file can return identity for unknown files
-      else session.store.source_file(path.implode) match {
-        case Some(file) if Path.explode(file).is_file => node_name(file)
-        case _ => error(s"Path ${quote(path.implode)} cannot be resolved: " +
-          "it is neither a file on disk nor resolvable by PIDE")
-      }
+  def theory_node_name(theory: String): Option[Document.Node.Name] =
+    if (Url.is_base_name(theory)) resources.find_theory_node(theory) else None
+
+  private def file_node_name(path: Path): Option[Document.Node.Name] =
+    resources.find_theory(path.file).orElse { // session theories
+      val node = resources.append_path("", path)
+      val candidate = Document.Node.Name(node, theory = Thy_Header.theory_name(node))
+      Option.when(candidate.path.is_file)(candidate)
     }
-  }
 
-  def node_name(s: String): Document.Node.Name =
-    Some(s).filter(Url.is_base_name(_)).flatMap(resources.find_theory_node)
-      .getOrElse(path_node_name(PIDE_AI_Util.path(s)))
+  private def unresolved(s: String): Nothing =
+    error(s"${quote(s)} is neither a theory nor an existing file")
 
-  def origin(node_name: Document.Node.Name): String =
-    if (node_name.is_theory && resources.find_theory_node(node_name.theory).isDefined)
+  def source_node_name(source_name: String): Document.Node.Name =
+    session.store.source_file(source_name).flatMap(PIDE_AI_Util.absolute_file)
+      .flatMap(file_node_name).getOrElse(unresolved(source_name))
+
+  def node_name(s: String, cwd: Option[Path]): Document.Node.Name =
+    theory_node_name(s).orElse(file_node_name(PIDE_AI_Util.path(s, cwd)))
+      .getOrElse(unresolved(s))
+
+  def print_origin(node_name: Document.Node.Name, cwd: Option[Path]): String =
+    if (theory_node_name(node_name.theory).contains(node_name)) // roundtrip-property
       node_name.theory // session-qualified
-    else node_name.node // full path
+    else PIDE_AI_Util.print_file(node_name.node, cwd)
 
   def is_base_session_theory(node_name: Document.Node.Name): Boolean =
     resources.loaded_theory(node_name)
@@ -214,7 +216,7 @@ class PIDE_AI_Session private(
       val new_snapshot = (if (is_base_session_theory(snapshot1.node_name)) session.snapshot()
         else snapshot1).switch(node_name)
       if (PIDE_AI_Util.is_loaded_dynamic(new_snapshot.version.nodes(node_name))) new_snapshot
-      else error(s"No PIDE snapshot available for ${quote(origin(node_name))}")
+      else error(s"No PIDE snapshot available for ${quote(print_origin(node_name, None))}")
     }
   }
 
@@ -260,7 +262,7 @@ class PIDE_AI_Session private(
           update(List(node_name -> PIDE_AI_Document_Model.node_perspective(node)
             .copy(overlays = change(node.perspective.overlays))))
         else if (require_theory)
-          error(s"${quote(origin(node_name))} is not a dynamically loaded theory")
+          error(s"${quote(print_origin(node_name, None))} is not a dynamically loaded theory")
       }
     }
     val result = Future.promise[Unit]
@@ -369,18 +371,18 @@ class PIDE_AI_Session private(
   }
 
   def resolve_dependencies(
-    origins: List[Document.Node.Name],
+    node_names: List[Document.Node.Name],
     progress: Progress
   ): Unit = {
-    @tailrec def loop(seen: Set[Document.Node.Name], origins: List[Document.Node.Name]): Unit = {
+    @tailrec def loop(seen: Set[Document.Node.Name], node_names: List[Document.Node.Name]): Unit = {
       val names = PIDE_AI_Dependencies.unloaded_dependencies(session,
-        tip_version(progress).nodes, origins, seen, progress)
+        tip_version(progress).nodes, node_names, seen, progress)
       if (names.nonEmpty) {
         read_update(names.map(_ -> Some(Nil)), hide_others = false, progress = progress)
         loop(seen ++ names, names)
       }
     }
-    loop(Set.empty, origins)
+    loop(Set.empty, node_names)
   }
 
   def unload(
@@ -388,7 +390,7 @@ class PIDE_AI_Session private(
     progress: Progress
   ): (List[Document.Node.Name], Document.Change) = {
     for (name <- node_names if is_base_session_theory(name))
-      error(s"Cannot unload base session theory ${quote(origin(name))}")
+      error(s"Cannot unload base session theory ${quote(print_origin(name, None))}")
     with_lock(progress) {
       val nodes = tip_version(progress).nodes
       val unloaded = PIDE_AI_Dependencies.removable_names(resources, nodes, node_names)

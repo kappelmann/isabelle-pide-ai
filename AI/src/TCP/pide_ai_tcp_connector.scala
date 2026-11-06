@@ -51,9 +51,11 @@ class PIDE_AI_TCP_Connector(
         None
     }
 
-  def connection_protocol(connection: Socket_Connection): Option[PIDE_AI_Protocol] =
+  def connection_header(
+    connection: Socket_Connection
+  ): Option[(PIDE_AI_Protocol, PIDE_AI_Client_Context)] =
     connection.with_timeout(handshake_timeout,
       error(s"No protocol name within ${handshake_timeout.message}")) {
-      PIDE_AI_Protocol_Handshake.read_protocol(protocols, connection)
+      PIDE_AI_Protocol_Handshake.server_handshake(protocols, connection)
     }
 }

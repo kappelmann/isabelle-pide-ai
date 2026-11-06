@@ -33,7 +33,7 @@ object PIDE_AI_Dependencies {
   }
 
   def disk_dependencies(
-    session: Headless.Session,
+    session: PIDE_AI_Headless.Session,
     names: List[Document.Node.Name],
     progress: Progress
   ): List[Document.Node.Name] = {
@@ -44,9 +44,9 @@ object PIDE_AI_Dependencies {
   }
 
   def unloaded_dependencies(
-    session: Headless.Session,
+    session: PIDE_AI_Headless.Session,
     nodes: Document.Nodes,
-    origins: List[Document.Node.Name],
+    node_names: List[Document.Node.Name],
     exclude: Set[Document.Node.Name],
     progress: Progress
   ): List[Document.Node.Name] = {
@@ -55,7 +55,7 @@ object PIDE_AI_Dependencies {
       !exclude(name) && !resources.loaded_theory(name) &&
       !PIDE_AI_Util.is_loaded_dynamic(nodes(name)) &&
       (name.path.is_file || resources.make_theory_content(name).isDefined)
-    val unloaded = known_dependencies(resources, nodes, origins).filter(is_unloaded)
+    val unloaded = known_dependencies(resources, nodes, node_names).filter(is_unloaded)
     disk_dependencies(session, unloaded, progress).filter(is_unloaded)
   }
 

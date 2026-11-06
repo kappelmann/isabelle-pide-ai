@@ -1,0 +1,12 @@
+--- a/src/Pure/PIDE/headless.scala
++++ b/src/Pure/PIDE/headless.scala
+@@ -620,7 +620,10 @@
+ 
+     val store: Store = Store(options)
+ 
++    override def append_path(prefix: String, source_path: Path): String =
++      File.symbolic_path((Path.explode(prefix) + source_path).canonical)
+ 
+     /* session */
+ 
+     def start_session(

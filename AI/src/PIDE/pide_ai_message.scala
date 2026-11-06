@@ -34,14 +34,19 @@ object PIDE_AI_Message {
     cmd: Option[Command],
     unicode_symbols: Boolean
   ) {
-    lazy val text: String = PIDE_AI_Util.elem_body_plain_text(
-      cmd.fold(elem)(output_message(snapshot, _, elem)), unicode_symbols)
+    def text(cwd: Option[Path]): String = PIDE_AI_Util.elem_body_plain_text(
+      cmd.fold(elem)(output_message(snapshot, _, elem, cwd)), unicode_symbols)
   }
 
-  def output_message(snapshot: Document.Snapshot, cmd: Command, msg: XML.Elem): XML.Elem =
+  def output_message(
+    snapshot: Document.Snapshot,
+    cmd: Command,
+    msg: XML.Elem,
+    cwd: Option[Path]
+  ): XML.Elem =
     XML.Elem(msg.markup, msg match {
         case Protocol.ML_Profiling(report) => XML.string(report.print)
-        case _ => PIDE_AI_Document_Command.resolve_positions(snapshot, cmd, msg.body)
+        case _ => PIDE_AI_Document_Command.resolve_positions(snapshot, cmd, msg.body, cwd)
       })
 
   def messages(
@@ -68,7 +73,8 @@ object PIDE_AI_Message {
 
   def messages_json(
     messages: Map[Message_Kind, List[Message]],
-    kinds: List[Message_Kind]
+    kinds: List[Message_Kind],
+    cwd: Option[Path]
   ): List[Option[JSON.Object.Entry]] =
-    kinds.map(kind => messages.get(kind).map(msgs => kind.toString -> msgs.map(_.text)))
+    kinds.map(kind => messages.get(kind).map(msgs => kind.toString -> msgs.map(_.text(cwd))))
 }

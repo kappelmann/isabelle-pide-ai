@@ -30,10 +30,11 @@ object Edit_Tool {
     session: PIDE_AI_Session,
     node_name: Document.Node.Name,
     request: Request,
-    progress: Progress
+    progress: Progress,
+    cwd: Option[Path]
   ): List[(Int, Int)] = {
     if (session.is_base_session_theory(node_name))
-      error(s"Cannot edit base session theory ${quote(session.origin(node_name))}")
+      error(s"Cannot edit base session theory ${quote(session.print_origin(node_name, cwd))}")
     PIDE_AI_Util.check_ordered_lines(request.start_line, request.end_line)
     session.with_lock(progress) {
       val current_text = session.read_update(
@@ -107,7 +108,8 @@ object Edit_Tool {
     session: PIDE_AI_Session,
     node_name: Document.Node.Name,
     args: JSON.Object.T,
-    progress: Progress
+    progress: Progress,
+    cwd: Option[Path]
   ): (List[(Int, Int)], JSON.Object.T) = {
     def pide_text(arg: JSON_Schema.Arg[String]): String =
       session.pide_text(node_name.path, Line.normalize(arg.get(args)))
@@ -115,7 +117,7 @@ object Edit_Tool {
       PIDE_AI_Tool_Schema.start_line_default_arg.get(args),
       PIDE_AI_Tool_Schema.opt_end_line_arg.get(args), pide_text(old_text_arg),
       edit_all_arg.get(args))
-    val edited_lines = edit(session, node_name, request, progress)
+    val edited_lines = edit(session, node_name, request, progress, cwd)
     val lines = edited_lines_arg.get(args) match {
       case Edited_Lines.none => None
       case Edited_Lines.range => PIDE_AI_Util.line_ranges_span(edited_lines)
@@ -140,12 +142,13 @@ class Edit_Tool extends PIDE_AI_Tool("edit") with PIDE_AI_Tool.Destructive {
   def handle(
     server: PIDE_AI_Server,
     args: JSON.Object.T,
-    progress: Progress
+    progress: Progress,
+    context: PIDE_AI_Client_Context
   ): PIDE_AI_Tool_Result =
     PIDE_AI_Tool_Result.result {
       val session = PIDE_AI_Tool_Util.running_session_param(server.sessions, args)
-      val node_name = PIDE_AI_Tool_Util.origin_param(session, args)
-      Edit_Tool.read_update_edit(session, node_name, args, progress)._2
+      val node_name = PIDE_AI_Tool_Util.origin_param(session, args, context.cwd)
+      Edit_Tool.read_update_edit(session, node_name, args, progress, context.cwd)._2
     }
 }
 

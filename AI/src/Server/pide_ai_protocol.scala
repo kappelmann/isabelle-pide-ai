@@ -16,7 +16,8 @@ object PIDE_AI_Protocol extends PIDE_AI_Registry.Kind[PIDE_AI_Protocol, PIDE_AI_
 
 class PIDE_AI_Protocol(
   val id: String,
-  val endpoint: (PIDE_AI_Server, Line_Connection, Logger) => PIDE_AI_Endpoint)
+  val endpoint: (PIDE_AI_Server, Line_Connection, PIDE_AI_Client_Context, Logger) =>
+    PIDE_AI_Endpoint)
 
 class PIDE_AI_Protocols(protocols: PIDE_AI_Protocol*)
 extends PIDE_AI_Registry.Entries(protocols.toList)

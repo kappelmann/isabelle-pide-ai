@@ -23,9 +23,9 @@ object PIDE_AI_Theory {
     base_session: List[Document.Node.Name],
     dynamic: List[Document.Node.Name]
   ) {
-    def json: JSON.Object.T =
-      JSON_Object("dynamic" -> dynamic.map(session.origin),
-        "base_session" -> base_session.map(session.origin))
+    def json(cwd: Option[Path]): JSON.Object.T =
+      JSON_Object("dynamic" -> dynamic.map(session.print_origin(_, cwd)),
+        "base_session" -> base_session.map(session.print_origin(_, cwd)))
   }
 
   object Status {
@@ -37,26 +37,30 @@ object PIDE_AI_Theory {
       val nodes_status = Document_Status.Nodes_Status.empty.update_nodes(
         Date.now(), session.resources, snapshot.state, snapshot.version,
         domain = Some(names.toSet))
-      names.map(name =>
-        Status(session.origin(name), nodes_status(name), nodes_status.overall_status(name)))
+      names.map(name => Status(name, nodes_status(name), nodes_status.overall_status(name)))
     }
 
     val status_keys = Document_Status.Overall_Status.values.map(_.toString).toSet
     def prefix_keys(obj: JSON.Object.T): JSON.Object.T =
       JSON_Object.prefix_keys("thys_", status_keys)(obj)
 
-    def statuses_json(statuses: List[Status]): JSON.Object.T = {
+    def statuses_json(
+      session: PIDE_AI_Session,
+      statuses: List[Status],
+      cwd: Option[Path]
+    ): JSON.Object.T = {
       val by_status = statuses.groupMapReduce(_.overall_status)(_ => 1)(_ + _)
       val theory_status_counts = JSON_Object(Document_Status.Overall_Status.values.flatMap(s =>
         by_status.get(s).map(s.toString -> _)))
       prefix_keys(theory_status_counts) ++
       JSON_Object.if_proper(statuses.nonEmpty,
-        JSON_Object("thys" -> JSON_Object(statuses.map(status => status.origin -> status.json))))
+        JSON_Object("thys" -> JSON_Object(statuses.map(status =>
+          session.print_origin(status.node_name, cwd) -> status.json))))
     }
   }
 
   sealed case class Status(
-    origin: String,
+    node_name: Document.Node.Name,
     node_status: Document_Status.Node_Status,
     overall_status: Document_Status.Overall_Status
   ) {
@@ -78,7 +82,8 @@ object PIDE_AI_Theory {
   def commands_running_json(
     session: PIDE_AI_Session,
     snapshot: Document.Snapshot,
-    names: List[Document.Node.Name]
+    names: List[Document.Node.Name],
+    cwd: Option[Path]
   ): JSON.Object.T =
     JSON_Object(names.flatMap { name =>
       val node_snapshot = session.switch(snapshot, name)
@@ -86,7 +91,7 @@ object PIDE_AI_Theory {
       val entries = (for {
         state <- PIDE_AI_Document_Command.States(node_snapshot, None, session.unicode_symbols)
         if state.status.contains(PIDE_AI_Document_Command.Status.running)
-      } yield state.problem(PIDE_AI_Document_Command.Status.running).json(doc, 1)).toList
-      proper_list(entries).map(session.origin(name) -> _)
+      } yield state.problem(PIDE_AI_Document_Command.Status.running).json(doc, 1, cwd)).toList
+      proper_list(entries).map(session.print_origin(name, cwd) -> _)
     })
 }

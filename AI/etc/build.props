@@ -29,6 +29,7 @@ sources = \
   src/PIDE/pide_ai_document_command.scala \
   src/PIDE/pide_ai_document_model.scala \
   src/PIDE/pide_ai_editor.scala \
+  src/PIDE/pide_ai_headless.scala \
   src/PIDE/pide_ai_file_watcher.scala \
   src/PIDE/pide_ai_markup.scala \
   src/PIDE/pide_ai_message.scala \
@@ -39,6 +40,7 @@ sources = \
   src/PIDE/pide_ai_sessions.scala \
   src/PIDE/pide_ai_theory.scala \
   src/Server/pide_ai_client_connector.scala \
+  src/Server/pide_ai_client_context.scala \
   src/Server/pide_ai_client_handler.scala \
   src/Server/pide_ai_client_info.scala \
   src/Server/pide_ai_connector.scala \

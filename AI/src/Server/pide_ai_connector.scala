@@ -19,7 +19,7 @@ abstract class PIDE_AI_Connector[C <: Line_Connection](
   def accept_connection(): Option[C]
   def accepting_connections: Boolean
   def stop_accepting_connections(): Unit
-  def connection_protocol(connection: C): Option[PIDE_AI_Protocol]
+  def connection_header(connection: C): Option[(PIDE_AI_Protocol, PIDE_AI_Client_Context)]
 
   val client_handler_scope = new Task_Scope[PIDE_AI_Client_Handler[C]]
   def client_handlers: List[PIDE_AI_Client_Handler[C]] = client_handler_scope.tasks

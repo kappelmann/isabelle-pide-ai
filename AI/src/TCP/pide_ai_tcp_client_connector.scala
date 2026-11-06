@@ -17,7 +17,7 @@ class PIDE_AI_TCP_Client_Connector(
   def remote: String =
     Socket_Connection.address_name(new InetSocketAddress(address, port))
 
-  def connect(protocol: PIDE_AI_Protocol): Socket_Connection = {
+  def connect(protocol: PIDE_AI_Protocol, context: PIDE_AI_Client_Context): Socket_Connection = {
     val socket = try { new Socket(address, port) }
       catch {
         case exn: ConnectException =>
@@ -28,7 +28,7 @@ class PIDE_AI_TCP_Client_Connector(
       connection.with_timeout(handshake_timeout,
         error(s"No answer to protocol handshake for ${quote(protocol.id)} " +
           s"on $remote within ${handshake_timeout.message}")) {
-        PIDE_AI_Protocol_Handshake.request_protocol(protocol, connection, remote)
+        PIDE_AI_Protocol_Handshake.client_handshake(protocol, context, connection, remote)
       }
       connection
     }

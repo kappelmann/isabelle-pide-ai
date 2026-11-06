@@ -100,7 +100,24 @@ object PIDE_AI_Util {
   def print_process_result(process_result: Process_Result): String =
     process_result.print_rc + if_proper(process_result.err, s": ${process_result.err}")
 
-  def path(s: String): Path = Path.explode(File.standard_path(s))
+  def path(s: String, cwd: Option[Path]): Path = {
+    val path = Path.explode(File.standard_path(s))
+    cwd.fold(path)(_ + path)
+  }
+
+  def relative_path(path: Path, cwd: Option[Path]): Path = {
+    val abs = path.absolute
+    cwd.flatMap(File.get_relative_path(_, abs)).getOrElse(abs)
+  }
+
+  def print_path(path: Path, cwd: Option[Path]): String = relative_path(path, cwd).implode
+
+  def absolute_file(file: String): Option[Path] =
+    try { Some(path(file, None).expand).filter(_.is_absolute) }
+    catch { case ERROR(_) => None }
+
+  def print_file(file: String, cwd: Option[Path]): String =
+    absolute_file(file).map(print_path(_, cwd)).getOrElse(file)
 
   def display_name(
     entry: Option[Name_Space.Entry],

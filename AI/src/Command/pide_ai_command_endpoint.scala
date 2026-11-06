@@ -13,8 +13,12 @@ object PIDE_AI_Command_Endpoint {
     List(List_Extensions_Tool, Start_Session_Tool, Stop_Server_Tool)
 }
 
-class PIDE_AI_Command_Endpoint(server: PIDE_AI_Server, connection: Line_Connection, log: Logger)
-extends PIDE_AI_Tool_Endpoint(server, connection, log) {
+class PIDE_AI_Command_Endpoint(
+  server: PIDE_AI_Server,
+  connection: Line_Connection,
+  context: PIDE_AI_Client_Context,
+  log: Logger
+) extends PIDE_AI_Tool_Endpoint(server, connection, context, log) {
   private def respond(body: JSON.T): Unit = connection.write_line(JSON.Format(body))
 
   private def respond_error(message: String): Unit =

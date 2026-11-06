@@ -18,20 +18,21 @@ object PIDE_AI_Definition {
   def unresolved(
     name_space_entry: Name_Space.Entry,
     name: String,
-    origin: String,
+    source_name: String,
     line: Int,
     msg: String,
     unicode_symbols: Boolean
   ): PIDE_AI_Definition = PIDE_AI_Definition(name, name_space_entry.kind,
-    def_label(name_space_entry, unicode_symbols), origin = Some(origin), line = Some(line),
-    note = Some(s"The definition entry's source file ${quote(origin)} " +
+    def_label(name_space_entry, unicode_symbols), location = Some(Left(source_name)),
+    line = Some(line),
+    note = Some(s"The definition entry's source file ${quote(source_name)} " +
       s"could not be resolved: $msg"))
 
   class Context(
     val session: PIDE_AI_Session,
     val snapshot: Document.Snapshot,
     snippet_lines: Int,
-    filter_origins: Option[Set[String]],
+    filter_node_names: Option[Set[Document.Node.Name]],
     def_entry_not_loaded: String
   ) {
     private val cache = mutable.Map.empty[Document.Node.Name, List[String]]
@@ -43,24 +44,23 @@ object PIDE_AI_Definition {
       name_space_entry: Name_Space.Entry,
       name: String,
       node_name: Document.Node.Name,
-      node_origin: String,
       line: Int
     ): PIDE_AI_Definition = PIDE_AI_Definition(name, name_space_entry.kind,
-      def_label(name_space_entry, session.unicode_symbols), origin = Some(node_origin),
+      def_label(name_space_entry, session.unicode_symbols), location = Some(Right(node_name)),
       line = Some(line), snippet = Option.when(snippet_lines > 0)(
         PIDE_AI_Util.numbered_lines_range(lines(node_name), line, line + snippet_lines - 1)))
 
     def resolve(name_space_entry: Name_Space.Entry, name: String): Option[PIDE_AI_Definition] = {
-      def resolve_at(origin: String, line: Int): Option[PIDE_AI_Definition] =
+      def resolve_at(source_name: String, line: Int): Option[PIDE_AI_Definition] =
         try {
-          val node_name = session.node_name(origin)
-          val node_origin = session.origin(node_name)
-          Option.when(filter_origins.forall(_.contains(node_origin)))(
-            resolved(name_space_entry, name, node_name, node_origin, line))
+          val node_name = session.source_node_name(source_name)
+          Option.when(filter_node_names.forall(_.contains(node_name)))(
+            resolved(name_space_entry, name, node_name, line))
         }
         catch {
           case ERROR(msg) =>
-            Some(unresolved(name_space_entry, name, origin, line, msg, session.unicode_symbols))
+            Some(unresolved(name_space_entry, name, source_name, line, msg,
+              session.unicode_symbols))
         }
       name_space_entry.properties match {
         case Position.Item_Def_File(def_file, def_line, _) => resolve_at(def_file, def_line)
@@ -82,12 +82,12 @@ object PIDE_AI_Definition {
     range: Option[Text.Range],
     snippet_lines: Int,
     kinds: List[String],
-    filter_origins: Option[Set[String]],
+    filter_node_names: Option[Set[Document.Node.Name]],
     def_entry_not_loaded: String
   ): List[PIDE_AI_Definition] = {
     val restricted = PIDE_AI_Util.restrict_text_range(snapshot.node.source, range)
     val context =
-      new Context(session, snapshot, snippet_lines, filter_origins, def_entry_not_loaded)
+      new Context(session, snapshot, snippet_lines, filter_node_names, def_entry_not_loaded)
     snapshot.cumulate(restricted, List.empty[PIDE_AI_Definition],
       Markup.Elements(Markup.ENTITY), _ => {
       case (definitions, Text.Info(r, XML.Elem(Markup.Entity(name_space_entry), _)))
@@ -100,11 +100,17 @@ object PIDE_AI_Definition {
   }
 
   def definitions_json(
-    definitions: List[PIDE_AI_Definition]
+    session: PIDE_AI_Session,
+    definitions: List[PIDE_AI_Definition],
+    cwd: Option[Path]
   ): Map[String, List[JSON.Object.T]] = {
     val grouped = definitions.foldLeft(VectorMap.empty[String, List[PIDE_AI_Definition]]) {
       case (groups, definition) =>
-        val origin = definition.origin.getOrElse("")
+        val origin = definition.location match {
+          case Some(Right(node_name)) => session.print_origin(node_name, cwd)
+          case Some(Left(source_name)) => PIDE_AI_Util.print_file(source_name, cwd)
+          case None => ""
+        }
         groups.updated(origin, definition :: groups.getOrElse(origin, Nil))
     }
     grouped.map { case (origin, entries) =>
@@ -118,7 +124,7 @@ object PIDE_AI_Definition {
         JSON_Object.flatten(
           site.head.line.map("line" -> _),
           site.head.snippet.map("snippet" -> _)) +
-        ("entities" -> site.map(_.json -- List("origin", "line", "snippet"))))
+        ("entities" -> site.map(_.json)))
     }
   }
 }
@@ -127,7 +133,7 @@ sealed case class PIDE_AI_Definition(
   name: String,
   kind: String,
   def_label: String,
-  origin: Option[String] = None,
+  location: Option[Either[String, Document.Node.Name]] = None,
   line: Option[Int] = None,
   snippet: Option[String] = None,
   note: Option[String] = None
@@ -137,8 +143,5 @@ sealed case class PIDE_AI_Definition(
       Some("name" -> name),
       Some("kind" -> kind),
       Option.when(def_label.nonEmpty)("def_label" -> def_label),
-      origin.map("origin" -> _),
-      line.map("line" -> _),
-      snippet.map("snippet" -> _),
       note.map("note" -> _))
 }

@@ -20,15 +20,16 @@ class Unload_Tool extends PIDE_AI_Tool("unload") with PIDE_AI_Tool.Destructive {
   def handle(
     server: PIDE_AI_Server,
     args: JSON.Object.T,
-    progress: Progress
+    progress: Progress,
+    context: PIDE_AI_Client_Context
   ): PIDE_AI_Tool_Result =
     PIDE_AI_Tool_Result.result {
       val session = PIDE_AI_Tool_Util.running_session_param(server.sessions, args)
       val origins = origins_arg.get(args)
-      val node_names = origins.map(session.node_name)
+      val node_names = origins.map(session.node_name(_, context.cwd))
       val (unloaded, change) = session.unload(node_names, progress)
       if (unloaded.nonEmpty) session.await_stable(change, progress)
-      JSON_Object("unloaded" -> unloaded.map(session.origin))
+      JSON_Object("unloaded" -> unloaded.map(session.print_origin(_, context.cwd)))
     }
 }
 

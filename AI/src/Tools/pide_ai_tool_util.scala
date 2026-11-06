@@ -28,38 +28,44 @@ object PIDE_AI_Tool_Util {
   ): List[PIDE_AI_Session] =
     sessions.running_sessions(PIDE_AI_Tool_Schema.running_sessions_arg.get(args))
 
-  def origin_param(session: PIDE_AI_Session, args: JSON.Object.T): Document.Node.Name =
-    session.node_name(PIDE_AI_Tool_Schema.origin_arg.get(args))
+  def origin_param(
+    session: PIDE_AI_Session,
+    args: JSON.Object.T,
+    cwd: Option[Path]
+  ): Document.Node.Name =
+    session.node_name(PIDE_AI_Tool_Schema.origin_arg.get(args), cwd)
 
-  def require_origin_snapshot(
+  def require_node_snapshot(
     session: PIDE_AI_Session,
     node_name: Document.Node.Name,
-    progress: Progress
+    progress: Progress,
+    cwd: Option[Path]
   ): Document.Snapshot = {
+    def origin = quote(session.print_origin(node_name, cwd))
     val snapshot = try { session.node_snapshot(node_name) } catch {
       case ERROR(_) =>
         if (PIDE_AI_Util.is_loaded_dynamic(session.tip_version(progress).nodes(node_name)))
-          error(s"The origin ${quote(session.origin(node_name))} is loaded but has not been " +
-            "processed yet. " + retry_soon_message)
+          error(s"The origin $origin is loaded but has not been processed yet. " +
+            retry_soon_message)
         else {
           session.read_update_resolve(node_name, Nil,
             await_stable_before_resolve = false, hide_others = false, progress = progress)
-          error(s"The origin ${quote(session.origin(node_name))} was not loaded and has now " +
-            "been queued for loading. " + retry_soon_message)
+          error(s"The origin $origin was not loaded and has now been queued for loading. " +
+            retry_soon_message)
         }
     }
     if (!node_name.is_theory && snapshot.commands_loading.isEmpty)
-      error(s"File ${quote(session.origin(node_name))} is not loaded by any theory. " +
-        "Load the containing theory first.")
+      error(s"File $origin is not loaded by any theory. Load the containing theory first.")
     snapshot
   }
 
-  def require_stable_origin_snapshot(
+  def require_stable_node_snapshot(
     session: PIDE_AI_Session,
     node_name: Document.Node.Name,
-    progress: Progress
+    progress: Progress,
+    cwd: Option[Path]
   ): Document.Snapshot = {
     session.await_stable(session.sync_dependencies_resolve(List(node_name), progress), progress)
-    require_origin_snapshot(session, node_name, progress)
+    require_node_snapshot(session, node_name, progress, cwd)
   }
 }

@@ -10,5 +10,6 @@ import isabelle._
 
 abstract class PIDE_AI_Endpoint(
   val server: PIDE_AI_Server,
-  val connection: Line_Connection
+  val connection: Line_Connection,
+  val context: PIDE_AI_Client_Context
 ) extends Task[Unit]

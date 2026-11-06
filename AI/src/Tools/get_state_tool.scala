@@ -82,9 +82,11 @@ object Get_State_Tool {
     start_line: Int,
     opt_end_line: Option[Int],
     request: Request,
-    progress: Progress
+    progress: Progress,
+    cwd: Option[Path]
   ): JSON.Object.T = {
-    val snapshot0 = PIDE_AI_Tool_Util.require_stable_origin_snapshot(session, node_name, progress)
+    val snapshot0 =
+      PIDE_AI_Tool_Util.require_stable_node_snapshot(session, node_name, progress, cwd)
     val range = Some(PIDE_AI_Util.check_text_range(
       Line.Document(snapshot0.node.source), start_line, opt_end_line))
     val (snapshot, states, edited, timed_out) =
@@ -93,7 +95,8 @@ object Get_State_Tool {
       else
         PIDE_AI_Document_Command.await_states(session, snapshot0, range, request.stop_on.stop,
           Some(request.timeout), get_state_delay(session.options), progress)
-    PIDE_AI_Document_Command.States.json(states, Line.Document(snapshot.node.source), request.report) ++
+    PIDE_AI_Document_Command.States.json(states, Line.Document(snapshot.node.source),
+      request.report, cwd) ++
     JSON_Object.flatten(Option.when(edited > 0)("cmds_edited_omitted" -> edited),
       Option.when(timed_out)("timed_out" -> true))
   }
@@ -114,15 +117,16 @@ class Get_State_Tool extends PIDE_AI_Tool("get_state") with PIDE_AI_Tool.Read_On
   def handle(
     server: PIDE_AI_Server,
     args: JSON.Object.T,
-    progress: Progress
+    progress: Progress,
+    context: PIDE_AI_Client_Context
   ): PIDE_AI_Tool_Result =
     PIDE_AI_Tool_Result.result {
       val session = PIDE_AI_Tool_Util.running_session_param(server.sessions, args)
-      val node_name = PIDE_AI_Tool_Util.origin_param(session, args)
+      val node_name = PIDE_AI_Tool_Util.origin_param(session, args, context.cwd)
       Get_State_Tool.state(session, node_name,
         PIDE_AI_Tool_Schema.start_line_default_arg.get(args),
         PIDE_AI_Tool_Schema.opt_end_line_arg.get(args),
-        Get_State_Tool.Request.from_json(args, timeout_arg), progress)
+        Get_State_Tool.Request.from_json(args, timeout_arg), progress, context.cwd)
     }
 }
 

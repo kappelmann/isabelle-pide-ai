@@ -47,6 +47,7 @@ To interactively explore the agent's changes, you may also run an Isabelle/jEdit
 - By default, the server uses Isabelle symbols via Unicode (e.g. `∀`) and writes them to disk as ASCII (e.g. `\<forall>`), as required by batch Isabelle tools like `isabelle build`.
     Use options `pide_ai_unicode_symbols` and `pide_ai_unicode_symbols_disk` to change either representation.
     The tool `isabelle symbols -d|-e FILES` converts files in either direction.
+- PIDE AI clients pass a working directory to the server. Paths are read and printed relative to it.
 
 ## Installing PIDE AI
 
@@ -119,7 +120,7 @@ Stop the server by stopping the process (Ctrl-C) or via the client `AI/clients/p
 **Note:**
 - Unlike in MCP, agents see the progress of tool calls (e.g. session builds) and can filter results before reading them,
     which can improve token usage. Installation of a JSON processor (e.g. [jq](https://jqlang.org)) is recommended.
-- Your agent needs the port! Tell it, or, if it is also connected via MCP using `pide_mcp -p PORT` (see below), it finds the port and clients in its MCP instructions.
+- Your agent needs the port. Tell it, or, if it is also connected via MCP using `pide_mcp -p PORT` (see below), it finds the port and clients in its MCP instructions.
 
 ### MCP
 

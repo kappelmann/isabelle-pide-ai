@@ -27,8 +27,8 @@ object PIDE_MCP {
         more_option_specs = List("s" -> (_ => existing_server = true))) { context =>
         def run_server(socket: Option[ServerSocket]): Unit =
           context.run_server(server =>
-            new PIDE_AI_Stdio_Connector(server, PIDE_MCP_Protocol, context.log,
-              context.message_log, on_client_closed = _ => server.stop()) ::
+            new PIDE_AI_Stdio_Connector(server, PIDE_MCP_Protocol, context.client_context,
+              context.log, context.message_log, on_client_closed = _ => server.stop()) ::
             socket.toList.map(context.tcp_connector(server, _)))
 
         def run_proxy(port: Int): Unit =
