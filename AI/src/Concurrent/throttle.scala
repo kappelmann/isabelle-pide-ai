@@ -16,12 +16,12 @@ class Throttle[A](delay: Time, log: Logger)(f: A => Unit) {
       }
   }.first(state.value._2 + delay - Time.now()) {
     synchronized {
-      state.change_result { case (latest, _) => (latest, (None, Time.now())) }.foreach(f)
+      state.change_result { (latest, _) => (latest, (None, Time.now())) }.foreach(f)
     }
   }
 
   def apply(a: A): Unit = {
-    state.change { case (_, last) => (Some(a), last) }
+    state.change { (_, last) => (Some(a), last) }
     event.invoke()
   }
 }

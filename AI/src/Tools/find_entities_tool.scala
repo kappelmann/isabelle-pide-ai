@@ -78,7 +78,7 @@ class Find_Entities_Tool extends PIDE_AI_Tool("find_entities") with PIDE_AI_Tool
         session, snapshot, Some(range), snippet_lines, definition_kinds, filter_node_names,
         "The definition entry has not been loaded yet. " +
         PIDE_AI_Tool_Util.retry_soon_message)
-      PIDE_AI_Definition.definitions_json(session, definitions, cwd)
+      PIDE_AI_Definition.definitions_json(session.resources, definitions, cwd)
     }
 }
 

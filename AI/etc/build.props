@@ -33,6 +33,8 @@ sources = \
   src/PIDE/pide_ai_file_watcher.scala \
   src/PIDE/pide_ai_markup.scala \
   src/PIDE/pide_ai_message.scala \
+  src/PIDE/pide_ai_nodes.scala \
+  src/PIDE/pide_ai_origin.scala \
   src/PIDE/pide_ai_query.scala \
   src/PIDE/pide_ai_session.scala \
   src/PIDE/pide_ai_session_spec.scala \

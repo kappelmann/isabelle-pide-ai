@@ -34,7 +34,7 @@ class PIDE_AI_Server(
   val scope = new Task_Scope[Task[?]]
   def stop(): Unit = scope.stop()
 
-  def run_services(operation: String, session: PIDE_AI_Session)(
+  def run_services(operation: String, session_id: String)(
     run: PIDE_AI_Service => Unit
   ): Unit = {
     val services = service_table.values.toList ::: tool_table.values.toList
@@ -42,7 +42,7 @@ class PIDE_AI_Server(
       Exn.capture { run(service) } match {
         case Exn.Exn(exn) if !Exn.is_interrupt(exn) =>
           Exn.Exn(ERROR(s"Fatal error during $operation of ${service.kind} " +
-            s"${quote(service.id)} for session ${quote(session.id)}: ${Exn.message(exn)}"))
+            s"${quote(service.id)} for session ${quote(session_id)}: ${Exn.message(exn)}"))
         case result => result
       }))
   }
@@ -51,12 +51,12 @@ class PIDE_AI_Server(
       def service_event(event: PIDE_AI_Sessions.Session_Event): PIDE_AI_Service.Session_Event =
         PIDE_AI_Service.Session_Event(PIDE_AI_Server.this, event.session, event.progress)
       override def started(event: PIDE_AI_Sessions.Session_Event): Unit =
-        run_services("start", event.session) { service =>
+        run_services("start", event.session.id) { service =>
           event.progress.expose_interrupt()
           service.started(service_event(event))
         }
       override def stopping(event: PIDE_AI_Sessions.Session_Event): Unit =
-        run_services("stop", event.session)(_.stopping(service_event(event)))
+        run_services("stop", event.session.id)(_.stopping(service_event(event)))
     }, log, base_progress, options)
 
   val startup = new PIDE_AI_Startup_Sessions(specs,

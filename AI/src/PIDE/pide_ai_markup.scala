@@ -19,7 +19,7 @@ object PIDE_AI_Markup {
     elements: Markup.Elements
   ): List[Text.Info[List[Text.Info[XML.Elem]]]] =
     snapshot.cumulate(range, List.empty[Text.Info[XML.Elem]], elements,
-      _ => { case (acc, info) => Some(info :: acc) })
+      _ => { (acc, info) => Some(info :: acc) })
 
   def bad(
     snapshot: Document.Snapshot,
@@ -71,7 +71,7 @@ object PIDE_AI_Markup {
         val name_at = PIDE_AI_Util.display_name(
           at_range.collectFirst { case Text.Info(_, XML.Elem(Markup.Entity(entry), _)) => entry },
           r, snapshot.node.source, unicode_symbols)
-        kind_and_type(at_range).map { case (kind, t) =>
+        kind_and_type(at_range).map { (kind, t) =>
           JSON_Object("name" -> name_at, "kind" -> kind, "type" -> t)
         }
       case _ => None

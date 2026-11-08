@@ -105,7 +105,7 @@ object PIDE_AI_Session_State {
     cwd: Option[Path]
   ): JSON.Object.T = {
     lazy val snapshot = session.snapshot()
-    lazy val theories = PIDE_AI_Theory.Loaded(session, snapshot.version.nodes)
+    lazy val theories = PIDE_AI_Nodes.Loaded(session.resources, snapshot.version.nodes)
     lazy val dynamic_thys = origins match {
       case None => theories.dynamic
       case Some(origins) =>
@@ -117,14 +117,17 @@ object PIDE_AI_Session_State {
     JSON_Object("session_id" -> session.id, "base_session" -> session.base_session) ++
     JSON.optional(PIDE_AI_Document_Command.Status.key(PIDE_AI_Document_Command.Status.running.name) ->
       Option.when(show.cmds_processing) {
-        PIDE_AI_Theory.commands_running_json(session, snapshot, dynamic_thys, cwd)
+        PIDE_AI_Document_Command.node_problems_json(session.resources,
+          PIDE_AI_Document_Command.status_problems(
+            PIDE_AI_Document_Command.Selection.nodes(session, snapshot, dynamic_thys),
+            PIDE_AI_Document_Command.Status.running, session.unicode_symbols), 1, cwd)
       }.filter(_.nonEmpty)) ++
     (show.dynamic_thys match {
       case Show.Dynamic_Thys.none => JSON.Object.empty
       case Show.Dynamic_Thys.names => JSON_Object("thys" -> print_origins(dynamic_thys))
       case Show.Dynamic_Thys.summary =>
-        PIDE_AI_Theory.Status.statuses_json(session,
-          PIDE_AI_Theory.Status.statuses(session, snapshot, dynamic_thys), cwd)
+        PIDE_AI_Theory.Status.statuses_json(session.resources,
+          PIDE_AI_Theory.Status.statuses(session.resources, snapshot, dynamic_thys), cwd)
     }) ++
     JSON.optional("base_session_thys" ->
       Option.when(show.base_session_thys)(print_origins(theories.base_session))) ++

@@ -58,13 +58,13 @@ object JSON_Schema {
 
     def dictionary[A](format: Format[A]): Format[VectorMap[String, A]] = {
       val unapply = (json: JSON.T) => JSON.Object.unapply(json).flatMap { obj =>
-        val entries = obj.iterator.map { case (name, value) =>
+        val entries = obj.iterator.map { (name, value) =>
             format.unapply(value).map(result => name -> result)
           }.toList
         Option.when(entries.forall(_.isDefined))(VectorMap.from(entries.flatten))
       }
       val apply = (map: VectorMap[String, A]) =>
-        JSON_Object(map.iterator.map { case (name, value) => name -> format(value) })
+        JSON_Object(map.iterator.map { (name, value) => name -> format(value) })
       Format(JSON_Object("type" -> "object", "additionalProperties" -> format.schema),
         unapply, apply)
     }

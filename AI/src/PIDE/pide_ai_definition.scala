@@ -99,20 +99,20 @@ object PIDE_AI_Definition {
   }
 
   def definitions_json(
-    session: PIDE_AI_Session,
+    resources: Resources,
     definitions: List[PIDE_AI_Definition],
     cwd: Option[Path]
   ): Map[String, List[JSON.Object.T]] = {
     val grouped = definitions.foldLeft(VectorMap.empty[String, List[PIDE_AI_Definition]]) {
       case (groups, definition) =>
         val origin = definition.location match {
-          case Some(Right(node_name)) => session.print_origin(node_name, cwd)
+          case Some(Right(node_name)) => PIDE_AI_Origin.print(resources, node_name, cwd)
           case Some(Left(source_name)) => PIDE_AI_Util.print_file(source_name, cwd)
           case None => ""
         }
         groups.updated(origin, definition :: groups.getOrElse(origin, Nil))
     }
-    grouped.map { case (origin, entries) =>
+    grouped.map { (origin, entries) =>
       val sites = entries.sortBy(entry => (entry.line, entry.name, entry.kind))
         .foldRight(List.empty[List[PIDE_AI_Definition]]) {
           case (entry, (site @ next :: rest) :: sites) if next.line == entry.line =>

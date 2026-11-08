@@ -64,7 +64,7 @@ object PIDE_AI_Util {
     line_ranges: List[(Int, Int)],
     context: Int
   ): Text.Perspective =
-    Text.Perspective(line_ranges.map { case (start_line, end_line) =>
+    Text.Perspective(line_ranges.map { (start_line, end_line) =>
       text_range(doc, (start_line - context) max 1, (end_line + context) min doc.lines.length)
         .getOrElse(error(
           s"Bad line range $start_line..$end_line (file has ${doc.lines.length} lines)")) })
@@ -79,7 +79,7 @@ object PIDE_AI_Util {
     Option.when(line_ranges.nonEmpty)((line_ranges.head._1, line_ranges.last._2))
 
   def numbered_lines(lines: IterableOnce[String], start_line: Int): String =
-    lines.iterator.zipWithIndex.map { case (l, i) =>
+    lines.iterator.zipWithIndex.map { (l, i) =>
       numbered_line(start_line + i, l) }.mkString("\n")
 
   def numbered_lines(text: String, start_line: Int): String =
@@ -126,13 +126,6 @@ object PIDE_AI_Util {
   ): String =
     entry.map(_.name).filter(_.nonEmpty).map(Symbols.output_decoded(unicode_symbols, _))
       .getOrElse(range.substring(source))
-
-  // a cleaned node remains in version.nodes but with empty source
-  def is_loaded_dynamic(node: Document.Node): Boolean =
-    node.get_blob match {
-      case Some(blob) => blob.source.nonEmpty
-      case None => !node.is_empty
-    }
 
   def intersect_range(full: Text.Range, range: Option[Text.Range]): Text.Range =
     range.fold(full)(r => full.try_restrict(r).getOrElse(Text.Range.zero))

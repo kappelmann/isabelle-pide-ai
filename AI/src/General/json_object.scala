@@ -23,7 +23,7 @@ object JSON_Object {
     if (b) body else JSON.Object.empty
 
   def prefix_keys(prefix: String, keys: Set[String])(obj: JSON.Object.T): JSON.Object.T =
-    obj.map { case (k, v) => (if (keys(k)) prefix + k else k, v) }
+    obj.map { (k, v) => (if (keys(k)) prefix + k else k, v) }
 
   def text(json: JSON.T): String = JSON.Value.String.unapply(json).getOrElse(JSON.Format(json))
 }

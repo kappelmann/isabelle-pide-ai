@@ -16,7 +16,7 @@ Paths are relative to a working directory (MCP: dir at connection, CLI: CWD).
 
 ## Edits and synchronisation
 - file_watcher service synchronises disk edits of loaded files. Most tools synchronise the file they work on immediately.
-- Edits re-check all later commands, also in dependent theories: check beyond the edited range.
+- Edits re-check all later commands, also in descendant theories: check beyond the edited range.
 - PIDE AI uses symbols (e.g. ∀ vs. \<forall>) as per options pide_ai_unicode_symbols (server) and pide_ai_unicode_symbols_disk (disk). Inputs may use either. Non-PIDE Isabelle tools may require ASCII: recode with `isabelle symbols`.
 
 ## Checking state

@@ -69,7 +69,7 @@ class PIDE_AI_Query(
     timeout: Option[Time] = None,
     stop: Editor.Output => Boolean = _ => false
   ): PIDE_AI_Query.Result = {
-    if (session.is_base_session_theory(context.node_name))
+    if (PIDE_AI_Nodes.is_base_session_theory(session.resources, context.node_name))
       error(s"Cannot query base session theory $origin")
     if (editor.current_command(context, require_snapshot()).isEmpty)
       error(s"No command at the given position of $origin")

@@ -34,7 +34,7 @@ object PIDE_AI_Registry {
       }
     val included = select(include_ids)
     val excluded = select(exclude_ids)
-    table.filter { case (id, _) => included(id) && !excluded(id) }
+    table.filter { (id, _) => included(id) && !excluded(id) }
   }
 
   abstract class Entries[A](val entries: List[A]) extends Isabelle_System.Service

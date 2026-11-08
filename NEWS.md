@@ -9,6 +9,7 @@ New in this PIDE AI version
 New in PIDE AI 2026
 ----------------------------
 
+* `get_state`: new `show_ancestor_thys`, `show_descendant_thys`, and `show_other_cmds_processing`.
 * Tool handles now receive the client's context. INCOMPATIBILITY.
 * Improved all tools and skills for more efficient token usage. INCOMPATIBILITY.
 * New client context, including a client's working directory (cwd). Paths are now parsed and printed relative to cwd. INCOMPATIBILITY.

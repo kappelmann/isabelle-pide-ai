@@ -55,7 +55,7 @@ object PIDE_AI_Message {
     command_start: Text.Offset,
     range: Text.Range,
     unicode_symbols: Boolean
-  ): Iterator[Message] = {
+  ): List[Message] = {
     def message_ranges(elem: XML.Elem): List[Text.Range] = {
       val ranges = PIDE_AI_Document_Command.elem_positions(snapshot, cmd, elem)
       if (ranges.isEmpty) List(range)
@@ -68,7 +68,7 @@ object PIDE_AI_Message {
       for {
         kind <- Message_Kind.of(elem)
         ranges = message_ranges(elem) if ranges.nonEmpty
-      } yield Message(kind, elem, ranges, snapshot, Some(cmd), unicode_symbols))
+      } yield Message(kind, elem, ranges, snapshot, Some(cmd), unicode_symbols)).toList
   }
 
   def messages_json(

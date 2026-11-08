@@ -56,7 +56,7 @@ object PIDE_AI_Progress {
   def theories_progress_msg(status: Progress.Nodes_Status): Option[Progress.Msg] = {
     val theories = status.domain.map(name => name.theory -> status(name))
     Option.when(theories.nonEmpty) {
-      val finished = theories.count({ case (_, st) => st.percentage == 100 })
+      val finished = theories.count((_, st) => st.percentage == 100)
       val running = for ((theory, st) <- theories if st.progress)
         yield theory + " " + st.percentage + "%"
       Progress.Message(Output.Kind.writeln,

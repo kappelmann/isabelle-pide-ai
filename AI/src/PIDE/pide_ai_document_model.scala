@@ -36,11 +36,11 @@ object PIDE_AI_Document_Model {
   def hide_edits(
     nodes: Document.Nodes,
     keep: Set[Document.Node.Name]
-  ): Iterator[Document.Edit_Text] =
-    nodes.iterator.collect {
+  ): List[Document.Edit_Text] =
+    nodes.iterator.collect[Document.Edit_Text] {
       case (name, node) if !keep(name) && !node.text_perspective.is_empty =>
         name -> node_perspective(node).copy(visible = Text.Perspective.empty)
-    }
+    }.toList
 
   def unload_edits(
     session: Document.Session,
@@ -66,7 +66,7 @@ object PIDE_AI_Document_Model {
       case None => replacement.restrict(node.text_perspective)
       case Some(visible_lines) =>
         val doc = Line.Document(text)
-        val line_ranges = visible_lines.map { case (start_line, opt_end_line) =>
+        val line_ranges = visible_lines.map { (start_line, opt_end_line) =>
           (start_line, opt_end_line.getOrElse(doc.lines.length)) }
         PIDE_AI_Util.check_text_perspective(doc, line_ranges, range_context)
     }

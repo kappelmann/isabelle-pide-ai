@@ -44,7 +44,7 @@ object PIDE_AI_Tool_Util {
     def origin = quote(session.print_origin(node_name, cwd))
     val snapshot = try { session.node_snapshot(node_name) } catch {
       case ERROR(_) =>
-        if (PIDE_AI_Util.is_loaded_dynamic(session.tip_version(progress).nodes(node_name)))
+        if (PIDE_AI_Nodes.is_loaded_dynamic(session.tip_version(progress).nodes(node_name)))
           error(s"The origin $origin is loaded but has not been processed yet. " +
             retry_soon_message)
         else {
@@ -54,7 +54,7 @@ object PIDE_AI_Tool_Util {
             retry_soon_message)
         }
     }
-    if (!node_name.is_theory && snapshot.commands_loading.isEmpty)
+    if (PIDE_AI_Nodes.node_theory(snapshot.version.nodes, node_name).isEmpty)
       error(s"File $origin is not loaded by any theory. Load the containing theory first.")
     snapshot
   }

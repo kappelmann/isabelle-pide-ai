@@ -33,7 +33,7 @@ object Edit_Tool {
     progress: Progress,
     cwd: Option[Path]
   ): List[(Int, Int)] = {
-    if (session.is_base_session_theory(node_name))
+    if (PIDE_AI_Nodes.is_base_session_theory(session.resources, node_name))
       error(s"Cannot edit base session theory ${quote(session.print_origin(node_name, cwd))}")
     PIDE_AI_Util.check_ordered_lines(request.start_line, request.end_line)
     session.with_lock(progress) {
@@ -63,7 +63,7 @@ object Edit_Tool {
       }
       val changed = computed_text != current_text
       val edited_doc = Line.Document(computed_text)
-      val edited_lines = replaced_ranges.zipWithIndex.map { case (range, i) =>
+      val edited_lines = replaced_ranges.zipWithIndex.map { (range, i) =>
         val start = range.start + i * (new_text.length - range.length)
         PIDE_AI_Util.range_lines(edited_doc, Text.Range(start, start + new_text.length))
       }

@@ -47,6 +47,9 @@ option pide_ai_file_watcher_delay : real = 0.5 for pide_ai
 option pide_ai_get_state_delay : real = 0.1 for pide_ai
   -- "delay for checking command status while awaiting commands (seconds)"
 
+option pide_ai_consolidate_delay : real = 0.2 for pide_ai
+  -- "delay to consolidate theories after their commands have finished (seconds)"
+
 
 section "Documents"
 

@@ -103,24 +103,52 @@ object PIDE_AI_Document_Command {
     }
   }
 
-  def single_command(snapshot: Document.Snapshot): Option[Command] =
-    if (!snapshot.node_name.is_theory) snapshot.commands_loading.headOption
-    else snapshot.node.get_theory
-
-  def select(
-    snapshot: Document.Snapshot,
-    range: Option[Text.Range]
+  enum Selection {
+    case node_command(cmd: Command, range: Text.Range)
      // commands intersecting range, with the intersection relative to their start
-  ): List[(Command, Text.Range)] =
-    single_command(snapshot) match {
-      case Some(cmd) =>
-        List(cmd -> PIDE_AI_Util.restrict_text_range(snapshot.node.source, range))
-      case None =>
-        range.fold(snapshot.node.command_iterator())(snapshot.node.command_iterator(_))
-          .map { case (cmd, start) =>
-            cmd -> (PIDE_AI_Util.intersect_range(cmd.range + start, range) - start)
-          }.toList
-    }
+    case commands(cmds: List[(Command, Text.Range)])
+
+    def parts: List[(Command, Text.Range)] =
+      this match {
+        case Selection.node_command(cmd, range) => List(cmd -> range)
+        case Selection.commands(cmds) => cmds
+      }
+
+    def filter(pred: ((Command, Text.Range)) => Boolean): Selection =
+      this match {
+        case Selection.node_command(cmd, range) =>
+          if (pred(cmd -> range)) this else Selection.commands(Nil)
+        case Selection.commands(cmds) => Selection.commands(cmds.filter(pred))
+      }
+
+    def filter_status(snapshot: Document.Snapshot, status: Status): Selection =
+      filter((cmd, _) =>
+        statuses(snapshot.state.command_status(snapshot.version, cmd)).contains(status))
+  }
+
+  object Selection {
+    def apply(snapshot: Document.Snapshot, range: Option[Text.Range]): Selection =
+      PIDE_AI_Nodes.node_command(snapshot.version.nodes, snapshot.node_name) match {
+        case Some(cmd) =>
+          node_command(cmd, PIDE_AI_Util.restrict_text_range(snapshot.node.source, range))
+        case None =>
+          commands(
+            range.fold(snapshot.node.command_iterator())(snapshot.node.command_iterator(_))
+              .map { (cmd, start) =>
+                cmd -> (PIDE_AI_Util.intersect_range(cmd.range + start, range) - start)
+              }.toList)
+      }
+
+    def nodes(
+      session: PIDE_AI_Session,
+      snapshot: Document.Snapshot,
+      names: List[Document.Node.Name]
+    ): List[(Document.Snapshot, Selection)] =
+      names.map { name =>
+        val node_snapshot = session.switch(snapshot, name)
+        node_snapshot -> Selection(node_snapshot, None)
+      }
+  }
 
   enum Problem {
     case status(status: Status, range: Text.Range, timing_ms: Long)
@@ -162,6 +190,20 @@ object PIDE_AI_Document_Command {
         case Problem.status(Status.running, _, timing_ms) => timing_ms
       })
   }
+
+  def node_problems_json(
+    resources: Resources,
+    node_problems: List[(Document.Snapshot, List[Problem])],
+    snippet_lines: Int,
+    cwd: Option[Path]
+  ): JSON.Object.T =
+    JSON_Object.flatten(node_problems.map { (snapshot, problems) =>
+      Option.when(problems.nonEmpty) {
+        val doc = Line.Document(snapshot.node.source)
+        PIDE_AI_Origin.print(resources, snapshot.node_name, cwd) ->
+          problems.map(_.json(doc, snippet_lines, cwd))
+      }
+    })
 
   object State {
     enum Detail { case errors, warnings, infos, goals, src, types, facts, markup }
@@ -214,8 +256,8 @@ object PIDE_AI_Document_Command {
               doc.position(r.start).line1)))
       }
 
-    def problem(st: Status): Problem = Problem.status(st, range, timing_ms)
-    lazy val problems: List[Problem] = status.filter(Status.problematic).map(problem) :::
+    lazy val problems: List[Problem] =
+      status.filter(Status.problematic).map(Problem.status(_, range, timing_ms)) :::
       bad.map(Problem.bad(_)) ::: (errors ::: warnings).map(Problem.message(_))
 
     def is_ignorable_now: Boolean = cmd.is_ignored && messages.isEmpty && problems.isEmpty
@@ -269,26 +311,24 @@ object PIDE_AI_Document_Command {
 
     def apply(
       snapshot: Document.Snapshot,
-      selection: List[(Command, Text.Range)],
+      selection: Selection,
       unicode_symbols: Boolean
     ): Iterator[State] =
-      single_command(snapshot) match {
-        case Some(single) =>
-          selection.iterator.filter(_._1 == single).flatMap { case (cmd, range) =>
-            if (snapshot.node_name.is_theory)
-              command_spans(snapshot, cmd, Some(range), unicode_symbols)
-            else {
-              val messages =
-                PIDE_AI_Message.messages(snapshot, cmd, 0, range, unicode_symbols).toList
-              Iterator(State(snapshot, cmd, range, messages, unicode_symbols))
-            }
+      selection match {
+        case Selection.node_command(cmd, range) =>
+          if (snapshot.node_name.is_theory)
+            command_spans(snapshot, cmd, Some(range), unicode_symbols)
+          else {
+            val messages =
+              PIDE_AI_Message.messages(snapshot, cmd, 0, range, unicode_symbols)
+            Iterator(State(snapshot, cmd, range, messages, unicode_symbols))
           }
-        case None =>
+        case Selection.commands(cmds) =>
           val starts = snapshot.node.command_iterator().toMap
-          for ((cmd, part) <- selection.iterator; start <- starts.get(cmd)) yield {
+          for ((cmd, part) <- cmds.iterator; start <- starts.get(cmd)) yield {
             val range = part + start
             State(snapshot, cmd, range,
-              PIDE_AI_Message.messages(snapshot, cmd, start, range, unicode_symbols).toList,
+              PIDE_AI_Message.messages(snapshot, cmd, start, range, unicode_symbols),
               unicode_symbols)
           }
       }
@@ -298,7 +338,7 @@ object PIDE_AI_Document_Command {
       range: Option[Text.Range],
       unicode_symbols: Boolean
     ): Iterator[State] =
-      apply(snapshot, select(snapshot, range), unicode_symbols)
+      apply(snapshot, Selection(snapshot, range), unicode_symbols)
 
     sealed case class Report(
       details: Set[State.Detail],
@@ -309,11 +349,12 @@ object PIDE_AI_Document_Command {
       snippet_lines: Int)
 
     def json(
+      snapshot: Document.Snapshot,
       states: Iterator[State],
-      doc: Line.Document,
       report: Report,
       cwd: Option[Path]
     ): JSON.Object.T = {
+      val doc = Line.Document(snapshot.node.source)
       def redundant_problem(state: State, problem: Problem): Boolean =
         problem.text(cwd).isEmpty && problem.message_kind.exists(state.messages_of(_).nonEmpty)
       val counts = mutable.Map[String, Int]().withDefaultValue(0)
@@ -405,20 +446,29 @@ object PIDE_AI_Document_Command {
   def await_states(
     session: PIDE_AI_Session,
     snapshot: Document.Snapshot,
-    range: Option[Text.Range],
+    selection: Selection,
     stop: List[Document_Status.Command_Status] => Boolean,
     timeout: Option[Time],
     delay: Time,
     progress: Progress
   ): (Document.Snapshot, Iterator[State], Int, Boolean) = {
-    val selection = select(snapshot, range)
-    val commands = selection.filterNot { case sel @ (cmd, _) =>
-      cmd.is_ignored &&
-        States(snapshot, List(sel), session.unicode_symbols).forall(_.is_ignorable_for_good)
-    }.map(_._1)
+    val ignored =
+      States(snapshot, selection.filter((cmd, _) => cmd.is_ignored), session.unicode_symbols)
+        .toList.groupBy(_.cmd)
+    val commands = selection.parts.map(_._1).filterNot(cmd =>
+      cmd.is_ignored && ignored.getOrElse(cmd, Nil).forall(_.is_ignorable_for_good))
     val (snapshot1, survivors, timed_out) = await(session, commands, stop, timeout, delay, progress)
     val node_snapshot = session.switch(snapshot1, snapshot.node_name)
     (node_snapshot, States(node_snapshot, selection, session.unicode_symbols),
       commands.count(cmd => !cmd.is_ignored && !survivors.contains(cmd)), timed_out)
   }
+
+  def status_problems(
+    selections: List[(Document.Snapshot, Selection)],
+    status: Status,
+    unicode_symbols: Boolean
+  ): List[(Document.Snapshot, List[Problem])] =
+    for ((snapshot, selection) <- selections)
+    yield snapshot -> States(snapshot, selection.filter_status(snapshot, status), unicode_symbols)
+      .flatMap(_.problems.filter(_.key == status.name)).toList
 }

@@ -51,7 +51,9 @@ object PIDE_AI_Session {
       fresh_build = spec.fresh_build, no_build = spec.no_build,
       progress = new Recode_Progress(progress, unicode_symbols(options))).check
     val session_options = base_options ++ (Options.Spec.eq("show_states", "true") ::
-      Options.Spec.eq("editor_output_state", "false") :: spec.options)
+      Options.Spec.eq("editor_output_state", "false") :: spec.options :::
+      List(Options.Spec.eq("headless_consolidate_delay",
+        options.check_name("pide_ai_consolidate_delay").value)))
     (session_options, session_background)
   }
 
@@ -146,34 +148,17 @@ class PIDE_AI_Session private(
     Exn.release(result)
   }
 
-  def theory_node_name(theory: String): Option[Document.Node.Name] =
-    if (Url.is_base_name(theory)) resources.find_theory_node(theory) else None
-
-  private def file_node_name(path: Path): Option[Document.Node.Name] =
-    resources.find_theory(path.file).orElse { // session theories
-      val node = resources.append_path("", path)
-      val candidate = Document.Node.Name(node, theory = Thy_Header.theory_name(node))
-      Option.when(candidate.path.is_file)(candidate)
-    }
-
-  private def unresolved(s: String): Nothing =
-    error(s"${quote(s)} is neither a theory nor an existing file")
-
   def source_node_name(source_name: String): Document.Node.Name =
-    session.store.source_file(source_name).flatMap(PIDE_AI_Util.absolute_file)
-      .flatMap(file_node_name).getOrElse(unresolved(source_name))
+    PIDE_AI_Origin.source_node_name(resources, session.store, source_name)
 
   def node_name(s: String, cwd: Option[Path]): Document.Node.Name =
-    theory_node_name(s).orElse(file_node_name(PIDE_AI_Util.path(s, cwd)))
-      .getOrElse(unresolved(s))
+    PIDE_AI_Origin.node_name(resources, s, cwd)
 
   def print_origin(node_name: Document.Node.Name, cwd: Option[Path]): String =
-    if (theory_node_name(node_name.theory).contains(node_name)) // roundtrip-property
-      node_name.theory // session-qualified
-    else PIDE_AI_Util.print_file(node_name.node, cwd)
+    PIDE_AI_Origin.print(resources, node_name, cwd)
 
-  def is_base_session_theory(node_name: Document.Node.Name): Boolean =
-    resources.loaded_theory(node_name)
+  private def is_base_session_theory(node_name: Document.Node.Name): Boolean =
+    PIDE_AI_Nodes.is_base_session_theory(resources, node_name)
 
   def snapshot(): Document.Snapshot = session.snapshot()
 
@@ -215,7 +200,7 @@ class PIDE_AI_Session private(
       val snapshot1 = snapshot
       val new_snapshot = (if (is_base_session_theory(snapshot1.node_name)) session.snapshot()
         else snapshot1).switch(node_name)
-      if (PIDE_AI_Util.is_loaded_dynamic(new_snapshot.version.nodes(node_name))) new_snapshot
+      if (PIDE_AI_Nodes.is_loaded_dynamic(new_snapshot.node)) new_snapshot
       else error(s"No PIDE snapshot available for ${quote(print_origin(node_name, None))}")
     }
   }
@@ -258,7 +243,7 @@ class PIDE_AI_Session private(
       require_ready()
       with_lock(progress) {
         val node = tip_version(progress).nodes(node_name)
-        if (PIDE_AI_Util.is_loaded_dynamic(node))
+        if (PIDE_AI_Nodes.is_loaded_dynamic(node))
           update(List(node_name -> PIDE_AI_Document_Model.node_perspective(node)
             .copy(overlays = change(node.perspective.overlays))))
         else if (require_theory)
@@ -305,13 +290,13 @@ class PIDE_AI_Session private(
   ): (Map[Document.Node.Name, String], Document.Change) = {
     val (models, change) = with_lock(progress) {
       val version = tip_version(progress)
-      val models1 = nodes.map { case (name, visible_lines) =>
+      val models1 = nodes.map { (name, visible_lines) =>
         PIDE_AI_Document_Model.make(session, name, version.nodes(name), read_file_content(name),
           visible_lines, PIDE_AI_Session.range_context(options))
       }
-      val other_edits = if (!hide_others) Iterator.empty
+      val other_edits = if (!hide_others) Nil
         else PIDE_AI_Document_Model.hide_edits(version.nodes, nodes.map(_._1).toSet)
-      (models1, update((other_edits ++ models1.iterator.flatMap(_.edits)).toList))
+      (models1, update(other_edits ::: models1.flatMap(_.edits)))
     }
     (models.map(model => model.node_name -> model.text).toMap, change)
   }
@@ -323,7 +308,7 @@ class PIDE_AI_Session private(
     with_lock(progress) {
       val nodes = tip_version(progress).nodes
       read_update(
-        node_names.filter(name => PIDE_AI_Util.is_loaded_dynamic(nodes(name))).map(_ -> None),
+        node_names.filter(name => PIDE_AI_Nodes.is_loaded_dynamic(nodes(name))).map(_ -> None),
         hide_others = false, progress = progress)
     }
 
