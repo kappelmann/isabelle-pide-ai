@@ -61,7 +61,7 @@ class PIDE_AI_Query(
 
   private def require_command(): Unit =
     for (command <- query.get_location)
-      if (!require_snapshot().node.commands.contains(command))
+      if (!PIDE_AI_Document_Command.snapshot_contains(require_snapshot(), command))
         error(s"The command of the $operation query in $origin is gone")
 
   def run(

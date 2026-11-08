@@ -38,7 +38,7 @@ object PIDE_AI_Progress {
   def await_delay[A](
     progress: Progress,
     message: => String,
-    delay: Time,
+    delay: => Time,
     progress_delay: Time
   )(value: => Option[A]): A =
     await(progress, message, progress_delay)(value.orElse { delay.sleep(); None })

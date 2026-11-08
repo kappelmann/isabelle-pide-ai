@@ -170,7 +170,7 @@ class PIDE_AI_Session private(
   def await_while_ready[A](
     progress: Progress,
     what: => String,
-    delay: Time = PIDE_AI_Session.poll_delay(options)
+    delay: => Time = PIDE_AI_Session.poll_delay(options)
   )(value: => Option[A]): A =
     PIDE_AI_Progress.await_delay(progress, await_message(what), delay,
       PIDE_AI_Session.progress_delay(options)) {

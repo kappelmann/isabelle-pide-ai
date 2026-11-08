@@ -44,6 +44,24 @@ object PIDE_AI_Document_Command {
       Option.when(status.is_finished)(Status.finished),
       Option.when(status.is_canceled)(Status.canceled)).flatten
 
+  def ignorable_status(
+    snapshot: Document.Snapshot,
+    cmd: Command
+  ): Option[Document_Status.Command_Status] =
+    if (!cmd.is_ignored) None
+    else {
+      val status = snapshot.state.command_status(snapshot.version, cmd)
+      Option.when(!statuses(status).exists(s => s != Status.running && Status.problematic(s)) &&
+        snapshot.command_results(cmd).is_empty)(status)
+    }
+  def is_ignorable_now(snapshot: Document.Snapshot, cmd: Command): Boolean =
+    ignorable_status(snapshot, cmd).isDefined
+  def is_ignorable_for_good(snapshot: Document.Snapshot, cmd: Command): Boolean =
+    ignorable_status(snapshot, cmd).exists(_.is_terminated)
+
+  def snapshot_contains(snapshot: Document.Snapshot, cmd: Command): Boolean =
+    snapshot.command_node(cmd).commands.contains(cmd)
+
   // cf. Rendering.overview_color
   def range_status(
     snapshot: Document.Snapshot,
@@ -260,8 +278,7 @@ object PIDE_AI_Document_Command {
       status.filter(Status.problematic).map(Problem.status(_, range, timing_ms)) :::
       bad.map(Problem.bad(_)) ::: (errors ::: warnings).map(Problem.message(_))
 
-    def is_ignorable_now: Boolean = cmd.is_ignored && messages.isEmpty && problems.isEmpty
-    def is_ignorable_for_good: Boolean = is_ignorable_now && command_status.is_terminated
+    def is_ignorable_now: Boolean = PIDE_AI_Document_Command.is_ignorable_now(snapshot, cmd)
 
     def json(doc: Line.Document, details: Set[State.Detail], cwd: Option[Path]): JSON.Object.T = {
       val (start_line, end_line) = PIDE_AI_Util.range_lines(doc, range)
@@ -426,20 +443,41 @@ object PIDE_AI_Document_Command {
     stop: List[Document_Status.Command_Status] => Boolean,
     timeout: Option[Time],
     delay: Time,
+    check_factor: Double,
     progress: Progress
-  ): (Document.Snapshot, List[Command], Boolean) = {
+  ): (Document.Snapshot, List[Command], List[Command], Boolean) = {
     val start = Time.now()
-    var terminated = 0
-    session.await_while_ready(progress, s"commands ($terminated/${commands.length} terminated)",
-      delay) {
-      val snapshot = session.snapshot()
-      val survivors = commands.filter(cmd =>
-        snapshot.version.nodes(cmd.node_name).commands.contains(cmd))
-      val statuses = survivors.map(snapshot.state.command_status(snapshot.version, _))
-      terminated = statuses.count(_.is_terminated)
-      val stopped = stop(statuses)
-      Option.when(stopped || timeout.exists(Time.now() - start >= _))(
-        (snapshot, survivors, !stopped))
+    var snapshot = session.snapshot()
+    def count(cmds: List[Command]): Int = cmds.count(!is_ignorable_now(snapshot, _))
+    var version = Document_ID.none
+    var survivors: List[Command] = Nil
+    var removed: List[Command] = Nil
+    var pending: List[Command] = Nil
+    var terminated: List[Document_Status.Command_Status] = Nil
+    var wait = delay
+    session.await_while_ready(progress,
+      s"commands (${count(survivors) - count(pending)}/${count(survivors)} terminated)", wait) {
+      val check_start = Time.now()
+      snapshot = session.snapshot()
+      if (snapshot.version.id != version) {
+        version = snapshot.version.id
+        val (survivors1, removed1) = commands.partition(snapshot_contains(snapshot, _))
+        survivors = survivors1
+        removed = removed1
+        pending = survivors
+        terminated = Nil
+      }
+      val (now_terminated, still_pending) =
+        pending.map(cmd => cmd -> snapshot.state.command_status(snapshot.version, cmd))
+          .partition(_._2.is_terminated)
+      pending = still_pending.map(_._1)
+      terminated = now_terminated.map(_._2) ::: terminated
+      val stopped = stop(still_pending.map(_._2) ::: terminated)
+      val now = Time.now()
+      wait = delay max (now - check_start).scale(check_factor)
+      timeout.foreach(t => wait = wait min (start + t - now))
+      Option.when(stopped || timeout.exists(now - start >= _))(
+        (snapshot, survivors, removed, !stopped))
     }
   }
 
@@ -450,17 +488,15 @@ object PIDE_AI_Document_Command {
     stop: List[Document_Status.Command_Status] => Boolean,
     timeout: Option[Time],
     delay: Time,
+    check_factor: Double,
     progress: Progress
   ): (Document.Snapshot, Iterator[State], Int, Boolean) = {
-    val ignored =
-      States(snapshot, selection.filter((cmd, _) => cmd.is_ignored), session.unicode_symbols)
-        .toList.groupBy(_.cmd)
-    val commands = selection.parts.map(_._1).filterNot(cmd =>
-      cmd.is_ignored && ignored.getOrElse(cmd, Nil).forall(_.is_ignorable_for_good))
-    val (snapshot1, survivors, timed_out) = await(session, commands, stop, timeout, delay, progress)
+    val commands = selection.parts.map(_._1).filterNot(is_ignorable_for_good(snapshot, _))
+    val (snapshot1, _, removed, timed_out) =
+      await(session, commands, stop, timeout, delay, check_factor, progress)
     val node_snapshot = session.switch(snapshot1, snapshot.node_name)
     (node_snapshot, States(node_snapshot, selection, session.unicode_symbols),
-      commands.count(cmd => !cmd.is_ignored && !survivors.contains(cmd)), timed_out)
+      removed.count(!is_ignorable_now(snapshot, _)), timed_out)
   }
 
   def status_problems(

@@ -9,6 +9,8 @@ import isabelle._
 object Get_State_Tool {
   def get_state_delay(options: Options): Time =
     options.seconds("pide_ai_get_state_delay")
+  def get_state_check_factor(options: Options): Double =
+    options.real("pide_ai_get_state_check_factor")
 
   enum Stop_On {
     case any_failed, all_terminated
@@ -124,6 +126,7 @@ object Get_State_Tool {
     progress: Progress,
     cwd: Option[Path]
   ): JSON.Object.T = {
+    val start = Time.now()
     val snapshot0 =
       PIDE_AI_Tool_Util.require_stable_node_snapshot(session, node_name, progress, cwd)
     val range = PIDE_AI_Util.check_text_range(
@@ -134,7 +137,8 @@ object Get_State_Tool {
         PIDE_AI_Document_Command.States(snapshot0, selection, session.unicode_symbols), 0, false)
       else
         PIDE_AI_Document_Command.await_states(session, snapshot0, selection,
-          request.stop_on.stop, Some(request.timeout), get_state_delay(session.options), progress)
+          request.stop_on.stop, Some((request.timeout - (Time.now() - start)) max Time.zero),
+          get_state_delay(session.options), get_state_check_factor(session.options), progress)
     val resources = session.resources
     val nodes = snapshot.version.nodes
     val summary = PIDE_AI_Document_Command.States.json(snapshot, states, request.report, cwd)

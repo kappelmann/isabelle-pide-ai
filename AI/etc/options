@@ -44,8 +44,11 @@ option pide_ai_client_infos_exclude : string = "" for pide_ai
 option pide_ai_file_watcher_delay : real = 0.5 for pide_ai
   -- "delay for polling loaded files for external changes (seconds)"
 
-option pide_ai_get_state_delay : real = 0.1 for pide_ai
+option pide_ai_get_state_delay : real = 0.02 for pide_ai
   -- "delay for checking command status while awaiting commands (seconds)"
+
+option pide_ai_get_state_check_factor : real = 5 for pide_ai
+  -- "minimum ratio of waiting to checking time while awaiting commands"
 
 option pide_ai_consolidate_delay : real = 0.2 for pide_ai
   -- "delay to consolidate theories after their commands have finished (seconds)"
