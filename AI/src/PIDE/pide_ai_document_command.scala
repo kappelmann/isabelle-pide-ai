@@ -17,13 +17,13 @@ object PIDE_AI_Document_Command {
     val name: String,
     val message_kind: Option[PIDE_AI_Message.Message_Kind] = None
   ) {
-    case unprocessed extends Status("unprocessed")
     // running confuses agents: "running" = "it worked"
     case running extends Status("processing")
     case failed extends Status("failed", Some(PIDE_AI_Message.Message_Kind.errors))
     case warned extends Status("warned", Some(PIDE_AI_Message.Message_Kind.warnings))
-    case finished extends Status("finished")
     case canceled extends Status("canceled")
+    case unprocessed extends Status("unprocessed")
+    case finished extends Status("finished")
   }
   object Status {
     val unproblematic: Set[Status] = Set(unprocessed, finished)
@@ -35,7 +35,10 @@ object PIDE_AI_Document_Command {
       JSON_Object.prefix_keys(prefix, values.map(_.name).toSet + bad)(obj)
   }
 
-  private def statuses(status: Document_Status.Command_Status): List[Status] =
+  def command_status(snapshot: Document.Snapshot, cmd: Command): Document_Status.Command_Status =
+    snapshot.state.command_status(snapshot.version, cmd)
+
+  def statuses(status: Document_Status.Command_Status): List[Status] =
     List(
       Option.when(status.is_unprocessed)(Status.unprocessed),
       Option.when(status.is_running)(Status.running),
@@ -44,20 +47,13 @@ object PIDE_AI_Document_Command {
       Option.when(status.is_finished)(Status.finished),
       Option.when(status.is_canceled)(Status.canceled)).flatten
 
-  def ignorable_status(
-    snapshot: Document.Snapshot,
-    cmd: Command
-  ): Option[Document_Status.Command_Status] =
-    if (!cmd.is_ignored) None
-    else {
-      val status = snapshot.state.command_status(snapshot.version, cmd)
-      Option.when(!statuses(status).exists(s => s != Status.running && Status.problematic(s)) &&
-        snapshot.command_results(cmd).is_empty)(status)
-    }
-  def is_ignorable_now(snapshot: Document.Snapshot, cmd: Command): Boolean =
-    ignorable_status(snapshot, cmd).isDefined
+  def is_ignorable(snapshot: Document.Snapshot, cmd: Command): Boolean =
+    cmd.is_ignored &&
+      !statuses(command_status(snapshot, cmd)).exists(status =>
+        status != Status.running && Status.problematic(status)) &&
+      snapshot.command_results(cmd).is_empty
   def is_ignorable_for_good(snapshot: Document.Snapshot, cmd: Command): Boolean =
-    ignorable_status(snapshot, cmd).exists(_.is_terminated)
+    is_ignorable(snapshot, cmd) && command_status(snapshot, cmd).is_terminated
 
   def snapshot_contains(snapshot: Document.Snapshot, cmd: Command): Boolean =
     snapshot.command_node(cmd).commands.contains(cmd)
@@ -140,8 +136,7 @@ object PIDE_AI_Document_Command {
       }
 
     def filter_status(snapshot: Document.Snapshot, status: Status): Selection =
-      filter((cmd, _) =>
-        statuses(snapshot.state.command_status(snapshot.version, cmd)).contains(status))
+      filter((cmd, _) => statuses(command_status(snapshot, cmd)).contains(status))
   }
 
   object Selection {
@@ -249,8 +244,8 @@ object PIDE_AI_Document_Command {
     messages: List[PIDE_AI_Message.Message],
     unicode_symbols: Boolean
   ) {
-    lazy val command_status: Document_Status.Command_Status = snapshot.state.command_status(
-      snapshot.version, cmd)
+    lazy val command_status: Document_Status.Command_Status =
+      PIDE_AI_Document_Command.command_status(snapshot, cmd)
     private lazy val range_status = PIDE_AI_Document_Command.range_status(snapshot, range)
     lazy val status: List[Status] = statuses(command_status).filter {
       case Status.warned => range_status.is_warned
@@ -278,7 +273,7 @@ object PIDE_AI_Document_Command {
       status.filter(Status.problematic).map(Problem.status(_, range, timing_ms)) :::
       bad.map(Problem.bad(_)) ::: (errors ::: warnings).map(Problem.message(_))
 
-    def is_ignorable_now: Boolean = PIDE_AI_Document_Command.is_ignorable_now(snapshot, cmd)
+    def is_ignorable: Boolean = PIDE_AI_Document_Command.is_ignorable(snapshot, cmd)
 
     def json(doc: Line.Document, details: Set[State.Detail], cwd: Option[Path]): JSON.Object.T = {
       val (start_line, end_line) = PIDE_AI_Util.range_lines(doc, range)
@@ -383,7 +378,7 @@ object PIDE_AI_Document_Command {
       var count_unproblematic = 0
       var count_listed_occurrences = 0
       val include_details = report.details.nonEmpty
-      for (state <- states if !state.is_ignorable_now) {
+      for (state <- states if !state.is_ignorable) {
         count += 1
         total_timing_ms += state.timing_ms
         for (status <- state.status if Status.unproblematic(status)) counts(status.name) += 1
@@ -425,12 +420,13 @@ object PIDE_AI_Document_Command {
 
       Status.prefix_keys(JSON_Object.flatten(
         Some("total_timing_ms" -> total_timing_ms) ::
-        List(Status.running, Status.failed, Status.warned, Status.canceled)
+        Status.values.toList.filter(Status.problematic)
           .map(status => occurrences_entry(status.name, status.message_kind)) :::
         List(bad, PIDE_AI_Message.Message_Kind.errors.toString,
           PIDE_AI_Message.Message_Kind.warnings.toString)
           .map(occurrences_entry(_, None)) :::
-        List(Status.unprocessed, Status.finished).map(status => count_entry(status.name)))) +
+        Status.values.toList.filter(Status.unproblematic)
+          .map(status => count_entry(status.name)))) +
       ("cmds" -> (JSON_Object("count" -> count) ++
         JSON_Object.if_proper(include_details, JSON_Object(
           "count_returned" -> returned_commands.length, "cmds" -> returned_commands.toList))))
@@ -448,7 +444,7 @@ object PIDE_AI_Document_Command {
   ): (Document.Snapshot, List[Command], List[Command], Boolean) = {
     val start = Time.now()
     var snapshot = session.snapshot()
-    def count(cmds: List[Command]): Int = cmds.count(!is_ignorable_now(snapshot, _))
+    def count(cmds: List[Command]): Int = cmds.count(!is_ignorable(snapshot, _))
     var version = Document_ID.none
     var survivors: List[Command] = Nil
     var removed: List[Command] = Nil
@@ -468,7 +464,7 @@ object PIDE_AI_Document_Command {
         terminated = Nil
       }
       val (now_terminated, still_pending) =
-        pending.map(cmd => cmd -> snapshot.state.command_status(snapshot.version, cmd))
+        pending.map(cmd => cmd -> command_status(snapshot, cmd))
           .partition(_._2.is_terminated)
       pending = still_pending.map(_._1)
       terminated = now_terminated.map(_._2) ::: terminated
@@ -496,7 +492,7 @@ object PIDE_AI_Document_Command {
       await(session, commands, stop, timeout, delay, check_factor, progress)
     val node_snapshot = session.switch(snapshot1, snapshot.node_name)
     (node_snapshot, States(node_snapshot, selection, session.unicode_symbols),
-      removed.count(!is_ignorable_now(snapshot, _)), timed_out)
+      removed.count(!is_ignorable(snapshot, _)), timed_out)
   }
 
   def status_problems(

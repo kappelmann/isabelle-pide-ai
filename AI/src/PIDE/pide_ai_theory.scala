@@ -8,18 +8,49 @@ package isabelle.pide.ai
 
 import isabelle._
 
+import scala.collection.mutable
+
 object PIDE_AI_Theory {
   object Status {
-    def statuses(
-      resources: Resources,
-      snapshot: Document.Snapshot,
-      names: List[Document.Node.Name]
-    ): List[Status] = {
-      val nodes_status = Document_Status.Nodes_Status.empty.update_nodes(
-        Date.now(), resources, snapshot.state, snapshot.version,
-        domain = Some(names.toSet))
-      names.map(name => Status(name, nodes_status(name), nodes_status.overall_status(name)))
+    // cf. Document_Status.Node_Status.make, Document_Status.Nodes_Status.overall_status
+    def apply(snapshot: Document.Snapshot, name: Document.Node.Name): Status = {
+      val node = snapshot.version.nodes(name)
+      var theory_status = Document_Status.Theory_Status.NONE
+      var total = 0
+      val counts = mutable.Map[PIDE_AI_Document_Command.Status, Int]().withDefaultValue(0)
+      for (cmd <- node.commands.iterator) {
+        val status = snapshot.state.command_status(snapshot.version, cmd)
+        theory_status = Document_Status.Theory_Status.merge(theory_status, status.theory_status)
+        if (!PIDE_AI_Document_Command.is_ignorable(snapshot, cmd)) {
+          total += 1
+          PIDE_AI_Document_Command.statuses(status).foreach(counts(_) += 1)
+        }
+      }
+
+      def percent(a: Int, b: Int): Int =
+        if (b == 0) 0 else ((a.toDouble / b) * 100).toInt
+
+      val consolidated = Document_Status.Theory_Status.consolidated(theory_status)
+      val percentage =
+        node.get_theory match {
+          case None =>
+            if (consolidated) 100
+            else percent(total - counts(PIDE_AI_Document_Command.Status.unprocessed), total).min(99)
+          case Some(command) =>
+            val processed =
+              snapshot.state.command_status(snapshot.version, command).timings.count_finished
+            percent(processed, command.span.theory_commands)
+        }
+      val overall_status =
+        if (!consolidated) Document_Status.Overall_Status.pending
+        else if (counts(PIDE_AI_Document_Command.Status.failed) == 0)
+          Document_Status.Overall_Status.ok
+        else Document_Status.Overall_Status.failed
+      Status(name, overall_status, percentage, counts.toMap)
     }
+
+    def statuses(snapshot: Document.Snapshot, names: List[Document.Node.Name]): List[Status] =
+      names.map(apply(snapshot, _))
 
     val status_keys = Document_Status.Overall_Status.values.map(_.toString).toSet
     def prefix_keys(obj: JSON.Object.T): JSON.Object.T =
@@ -42,25 +73,21 @@ object PIDE_AI_Theory {
 
   sealed case class Status(
     node_name: Document.Node.Name,
-    node_status: Document_Status.Node_Status,
-    overall_status: Document_Status.Overall_Status
+    overall_status: Document_Status.Overall_Status,
+    percentage: Int,
+    counts: Map[PIDE_AI_Document_Command.Status, Int]
   ) {
     def is_ok: Boolean = overall_status == Document_Status.Overall_Status.ok
     def is_failed: Boolean = overall_status == Document_Status.Overall_Status.failed
     def is_pending: Boolean = overall_status == Document_Status.Overall_Status.pending
 
     def json: JSON.Object.T = {
-      val command_status_counts = JSON_Object((List(
-        PIDE_AI_Document_Command.Status.unprocessed.name -> node_status.unprocessed,
-        PIDE_AI_Document_Command.Status.running.name -> node_status.running,
-        PIDE_AI_Document_Command.Status.failed.name -> node_status.failed,
-        PIDE_AI_Document_Command.Status.warned.name -> node_status.warned) :::
-        Option.when(!is_ok)(
-          PIDE_AI_Document_Command.Status.finished.name -> node_status.finished).toList)
-        .filter(_._2 > 0))
+      val command_status_counts = JSON_Object(
+        PIDE_AI_Document_Command.Status.values.toList
+          .filterNot(status => is_ok && status == PIDE_AI_Document_Command.Status.finished)
+          .flatMap(status => counts.get(status).map(status.name -> _)))
       JSON_Object("status" -> overall_status.toString) ++
-      JSON.optional("percent_processed" ->
-        Option.when(node_status.percentage < 100)(node_status.percentage)) ++
+      JSON.optional("percent_processed" -> Option.when(percentage < 100)(percentage)) ++
       PIDE_AI_Document_Command.Status.prefix_keys(command_status_counts)
     }
   }

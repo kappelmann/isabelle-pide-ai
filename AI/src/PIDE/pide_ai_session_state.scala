@@ -127,7 +127,7 @@ object PIDE_AI_Session_State {
       case Show.Dynamic_Thys.names => JSON_Object("thys" -> print_origins(dynamic_thys))
       case Show.Dynamic_Thys.summary =>
         PIDE_AI_Theory.Status.statuses_json(session.resources,
-          PIDE_AI_Theory.Status.statuses(session.resources, snapshot, dynamic_thys), cwd)
+          PIDE_AI_Theory.Status.statuses(snapshot, dynamic_thys), cwd)
     }) ++
     JSON.optional("base_session_thys" ->
       Option.when(show.base_session_thys)(print_origins(theories.base_session))) ++

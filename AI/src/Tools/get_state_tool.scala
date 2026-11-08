@@ -145,7 +145,7 @@ object Get_State_Tool {
     lazy val dynamic_thys = PIDE_AI_Nodes.Loaded(resources, nodes).dynamic
     val thys = PIDE_AI_Nodes.node_theory(nodes, node_name).toList
     def statuses(names: Set[Document.Node.Name]): List[PIDE_AI_Theory.Status] =
-      PIDE_AI_Theory.Status.statuses(resources, snapshot, dynamic_thys.filter(names -- thys))
+      PIDE_AI_Theory.Status.statuses(snapshot, dynamic_thys.filter(names -- thys))
     val ancestors = request.show_ancestor_thys.select(
       statuses(PIDE_AI_Dependencies.known_dependencies(resources, nodes, thys).toSet))
     val descendants =
