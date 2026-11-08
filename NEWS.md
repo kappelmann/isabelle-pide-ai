@@ -10,6 +10,7 @@ New in PIDE AI 2026
 ----------------------------
 
 * Tool handles now receive the client's context. INCOMPATIBILITY.
+* Improved all tools and skills for more efficient token usage. INCOMPATIBILITY.
 * New client context, including a client's working directory (cwd). Paths are now parsed and printed relative to cwd. INCOMPATIBILITY.
 * Option `pide_ai_long_running_threshold` is split into `pide_ai_build_long_running_threshold` and `pide_ai_log_long_running_threshold` for the server's console and log file. INCOMPATIBILITY.
 * New option `pide_ai_build_report_nodes_status_delay` to set the minimum delay between progress reports of session builds.
@@ -38,7 +39,6 @@ New in PIDE AI 2026
 * New service `file_watcher`: changes of loaded files on disk are synced with their PIDE state.
     Use option `pide_mcp_file_watcher_delay` to configure the polling delay.
 * New `service` extensions with per-session start and stop hooks, configurable via options `pide_mcp_services_include` and `pide_mcp_services_exclude`.
-* Improved all tools and skills for more efficient token usage. INCOMPATIBILITY.
 * New option `pide_mcp_unicode_symbols_disk` to store Isabelle symbols in source files via Unicode or ASCII. Symbols are now also recoded in `.sml` and `.sig` files.
 * New Isabelle tool `isabelle symbols` to encode or decode Isabelle symbols in files.
 * New option `pide_mcp_tools_exclude` to disable tools at startup time. Option `pide_mcp_tools` is renamed to `pide_mcp_tools_include`. INCOMPATIBILITY.

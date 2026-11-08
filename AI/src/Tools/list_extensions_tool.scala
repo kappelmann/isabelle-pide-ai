@@ -12,13 +12,13 @@ object List_Extensions_Tool extends PIDE_AI_Tool("list_extensions") with PIDE_AI
   val names_arg = JSON_Schema.Arg.optional(
     "names", "Extensions to list. Default: all.",
     JSON_Schema.Format.list(JSON_Schema.Format.string))
-  val include_description_arg = JSON_Schema.Arg.default(
-    "include_description", "", JSON_Schema.Format.bool, true)
-  val include_input_schema_arg = JSON_Schema.Arg.default(
-    "include_input_schema", "", JSON_Schema.Format.bool, false)
+  val show_description_arg = JSON_Schema.Arg.default(
+    "show_description", "", JSON_Schema.Format.bool, true)
+  val show_input_schema_arg = JSON_Schema.Arg.default(
+    "show_input_schema", "", JSON_Schema.Format.bool, false)
 
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(
-    List(names_arg, include_description_arg, include_input_schema_arg))
+    List(names_arg, show_description_arg, show_input_schema_arg))
 
   def handle(
     server: PIDE_AI_Server,
@@ -33,17 +33,17 @@ object List_Extensions_Tool extends PIDE_AI_Tool("list_extensions") with PIDE_AI
         val unknown = names.filterNot(name => tables.exists(_.isDefinedAt(name)))
         if (unknown.nonEmpty) error(s"Unknown extension(s): ${commas_quote(unknown.toList.sorted)}")
       }
-      val include_description = include_description_arg.get(args)
-      val include_input_schema = include_input_schema_arg.get(args)
+      val show_description = show_description_arg.get(args)
+      val show_input_schema = show_input_schema_arg.get(args)
       def entry(service: PIDE_AI_Service): JSON.T =
-        if (!include_description && !include_input_schema) service.id
+        if (!show_description && !show_input_schema) service.id
         else {
           val input_schema = service match {
-            case tool: PIDE_AI_Tool if include_input_schema => Some(tool.input_schema)
+            case tool: PIDE_AI_Tool if show_input_schema => Some(tool.input_schema)
             case _ => None
           }
           JSON_Object("name" -> service.id) ++
-          JSON.optional("description" -> Option.when(include_description)(service.description)) ++
+          JSON.optional("description" -> Option.when(show_description)(service.description)) ++
           JSON.optional("inputSchema" -> input_schema)
         }
       def entries(table: Map[String, PIDE_AI_Service]): List[JSON.T] =

@@ -7,41 +7,26 @@ package isabelle.pide.ai
 import isabelle._
 
 object PIDE_AI_Session_State {
-  object Include {
-    enum Options { case `false`, `true`, changed }
-
-    object Options {
-      private val strings = JSON_Schema.Format.enumeration(values)
-      val format: JSON_Schema.Format[Options] = JSON_Schema.Format(
-        JSON_Object("type" -> List("string", "boolean"),
-          "enum" -> (List[JSON.T](false, true) ::: values.map(strings(_)).toList)),
-        {
-          case JSON.Value.Boolean(mode) => Some(if (mode) `true` else `false`)
-          case json => strings.unapply(json)
-        },
-        {
-          case `false` => false
-          case `true` => true
-          case mode => strings(mode)
-        })
-    }
+  object Show {
+    enum Dynamic_Thys { case none, names, summary }
+    enum Options { case none, changed, all }
   }
 
-  sealed case class Include(
+  sealed case class Show(
     cmds_processing: Boolean,
-    thy_status: Boolean,
-    loaded_thys: Boolean,
+    dynamic_thys: Show.Dynamic_Thys,
+    base_session_thys: Boolean,
     session_dirs: Boolean,
-    options: Include.Options,
+    options: Show.Options,
     statistics: Boolean)
 
-  def options_json(mode: Include.Options, options: Options): JSON.Object.T = {
+  def options_json(mode: Show.Options, options: Options): JSON.Object.T = {
     def json(entries: Iterator[Options.Entry]): JSON.Object.T =
       JSON_Object("options" -> JSON_Object(entries.map(entry => entry.name -> entry.value)))
     mode match {
-      case Include.Options.`false` => JSON.Object.empty
-      case Include.Options.`true` => json(options.iterator)
-      case Include.Options.changed =>
+      case Show.Options.none => JSON.Object.empty
+      case Show.Options.all => json(options.iterator)
+      case Show.Options.changed =>
         json(options.iterator.filter(entry => entry.value != entry.default_value))
     }
   }
@@ -116,30 +101,37 @@ object PIDE_AI_Session_State {
   def json(
     session: PIDE_AI_Session,
     origins: Option[List[String]],
-    include: Include,
+    show: Show,
     cwd: Option[Path]
   ): JSON.Object.T = {
     lazy val snapshot = session.snapshot()
     lazy val theories = PIDE_AI_Theory.Loaded(session, snapshot.version.nodes)
-    lazy val names = origins match {
+    lazy val dynamic_thys = origins match {
       case None => theories.dynamic
       case Some(origins) =>
         val selected = origins.map(session.node_name(_, cwd)).toSet
         theories.dynamic.filter(selected.contains)
     }
-    JSON_Object("session" -> session.id, "base_session" -> session.base_session) ++
+    def print_origins(names: List[Document.Node.Name]): List[String] =
+      names.map(session.print_origin(_, cwd))
+    JSON_Object("session_id" -> session.id, "base_session" -> session.base_session) ++
     JSON.optional(PIDE_AI_Document_Command.Status.key(PIDE_AI_Document_Command.Status.running.name) ->
-      Option.when(include.cmds_processing) {
-        PIDE_AI_Theory.commands_running_json(session, snapshot, names, cwd)
+      Option.when(show.cmds_processing) {
+        PIDE_AI_Theory.commands_running_json(session, snapshot, dynamic_thys, cwd)
       }.filter(_.nonEmpty)) ++
-    JSON_Object.if_proper(include.thy_status,
-      PIDE_AI_Theory.Status.statuses_json(session,
-        PIDE_AI_Theory.Status.statuses(session, snapshot, names), cwd)) ++
-    JSON.optional("loaded_thys" -> Option.when(include.loaded_thys)(theories.json(cwd))) ++
-    JSON.optional("session_dirs" -> Option.when(include.session_dirs)(
+    (show.dynamic_thys match {
+      case Show.Dynamic_Thys.none => JSON.Object.empty
+      case Show.Dynamic_Thys.names => JSON_Object("thys" -> print_origins(dynamic_thys))
+      case Show.Dynamic_Thys.summary =>
+        PIDE_AI_Theory.Status.statuses_json(session,
+          PIDE_AI_Theory.Status.statuses(session, snapshot, dynamic_thys), cwd)
+    }) ++
+    JSON.optional("base_session_thys" ->
+      Option.when(show.base_session_thys)(print_origins(theories.base_session))) ++
+    JSON.optional("session_dirs" -> Option.when(show.session_dirs)(
       session.directories().map(PIDE_AI_Util.print_path(_, cwd)))) ++
-    options_json(include.options, session.options) ++
-    JSON_Object.if_proper(include.statistics, {
+    options_json(show.options, session.options) ++
+    JSON_Object.if_proper(show.statistics, {
       val statistics = session.runtime_statistics()
       if (statistics.isEmpty) JSON_Object("note" -> "no ML statistics reported yet")
       else ml_stats_json(statistics)

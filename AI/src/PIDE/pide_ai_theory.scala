@@ -13,20 +13,13 @@ object PIDE_AI_Theory {
     def apply(session: PIDE_AI_Session, nodes: Document.Nodes): Loaded = {
       val all_nodes = nodes.topological_order.filter(_.is_theory)
       val (base_session, dynamic) = all_nodes.partition(session.is_base_session_theory)
-      Loaded(session, base_session,
-        dynamic.filter(name => PIDE_AI_Util.is_loaded_dynamic(nodes(name))))
+      Loaded(base_session, dynamic.filter(name => PIDE_AI_Util.is_loaded_dynamic(nodes(name))))
     }
   }
 
   sealed case class Loaded private(
-    session: PIDE_AI_Session,
     base_session: List[Document.Node.Name],
-    dynamic: List[Document.Node.Name]
-  ) {
-    def json(cwd: Option[Path]): JSON.Object.T =
-      JSON_Object("dynamic" -> dynamic.map(session.print_origin(_, cwd)),
-        "base_session" -> base_session.map(session.print_origin(_, cwd)))
-  }
+    dynamic: List[Document.Node.Name])
 
   object Status {
     def statuses(
@@ -74,7 +67,8 @@ object PIDE_AI_Theory {
         Option.when(!ok)(PIDE_AI_Document_Command.Status.finished.name -> node_status.finished).toList)
         .filter(_._2 > 0))
       JSON_Object("status" -> overall_status.toString) ++
-      JSON_Object.if_proper(!ok, JSON_Object("percent_processed" -> node_status.percentage)) ++
+      JSON.optional("percent_processed" ->
+        Option.when(node_status.percentage < 100)(node_status.percentage)) ++
       PIDE_AI_Document_Command.Status.prefix_keys(command_status_counts)
     }
   }

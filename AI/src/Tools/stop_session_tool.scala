@@ -11,7 +11,7 @@ class Stop_Session_Tool extends PIDE_AI_Tool("stop_session") with PIDE_AI_Tool.D
     PIDE_AI_Tool_Schema.session_restart
 
   val sessions_arg = JSON_Schema.Arg.optional(
-    "sessions", "Stoppable session ids. Default: all stoppable sessions.",
+    "session_ids", "Default: all stoppable ones.",
     JSON_Schema.Format.list(JSON_Schema.Format.string))
 
   def input_schema: JSON.Object.T =

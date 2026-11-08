@@ -112,7 +112,7 @@ Agents can call PIDE AI's tools via command-based interaction, e.g. using the CL
 # start a server on port 1234
 isabelle/bin/isabelle pide_ai -p 1234
 # then, in another shell
-AI/clients/pide_ai_cli 1234 list_extensions '{"include_input_schema": true}' # or pide_ai_cli.ps1 in PowerShell (Windows)
+AI/clients/pide_ai_cli 1234 list_extensions '{"show_input_schema": true}' # or pide_ai_cli.ps1 in PowerShell (Windows)
 ```
 
 Stop the server by stopping the process (Ctrl-C) or via the client `AI/clients/pide_ai_cli 1234 stop_server`.

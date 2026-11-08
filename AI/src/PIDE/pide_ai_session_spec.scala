@@ -71,7 +71,7 @@ object PIDE_AI_Session_Spec {
     JSON_Schema.Format.string.map(option, _.toString)
 
   val session_arg = JSON_Schema.Arg.optional(
-    "session", s"Session id to use. Default: generated based on ${quote("logic")}.",
+    "session_id", s"Default: generated based on ${quote("logic")}.",
     JSON_Schema.Format.string)
   val logic_arg = JSON_Schema.Arg.default(
     "logic", "Session to work with.", JSON_Schema.Format.string, default_spec.logic)

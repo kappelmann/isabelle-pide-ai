@@ -22,32 +22,32 @@ with PIDE_AI_Tool.Read_Only {
     JSON_Schema.Format.dictionary(
       JSON_Schema.Format.list(JSON_Schema.Format.string)),
     VectorMap.empty)
-  val include_cmds_processing_arg = JSON_Schema.Arg.default(
-    "include_cmds_processing", "", JSON_Schema.Format.bool, true)
-  val include_thy_status_arg = JSON_Schema.Arg.default(
-    "include_thy_status", "Status, progress, command counts.",
-    JSON_Schema.Format.bool, true)
-  val include_loaded_thys_arg = JSON_Schema.Arg.default(
-    "include_loaded_thys", "", JSON_Schema.Format.bool, false)
-  val include_session_dirs_arg = JSON_Schema.Arg.default(
-    "include_session_dirs", "Directories from which a session resolves files.",
+  val show_cmds_processing_arg = JSON_Schema.Arg.default(
+    "show_cmds_processing", "", JSON_Schema.Format.bool, true)
+  val show_dynamic_thys_arg = JSON_Schema.Arg.default(
+    "show_dynamic_thys", s"${quote("summary")}: status, progress, command counts.",
+    JSON_Schema.Format.enumeration(PIDE_AI_Session_State.Show.Dynamic_Thys.values),
+    PIDE_AI_Session_State.Show.Dynamic_Thys.summary)
+  val show_base_session_thys_arg = JSON_Schema.Arg.default(
+    "show_base_session_thys", "", JSON_Schema.Format.bool, false)
+  val show_session_dirs_arg = JSON_Schema.Arg.default(
+    "show_session_dirs", "Directories from which a session resolves files.",
     JSON_Schema.Format.bool, false)
-  val include_options_arg = JSON_Schema.Arg.default(
-    "include_options",
+  val show_options_arg = JSON_Schema.Arg.default(
+    "show_options",
     "Isabelle session options. " +
-    s"${quote("changed")} shows options that differ from their default. " +
-    "true shows all.",
-    PIDE_AI_Session_State.Include.Options.format,
-    PIDE_AI_Session_State.Include.Options.`false`)
-  val include_statistics_arg = JSON_Schema.Arg.default(
-    "include_statistics",
+    s"${quote("changed")} shows options that differ from their default.",
+    JSON_Schema.Format.enumeration(PIDE_AI_Session_State.Show.Options.values),
+    PIDE_AI_Session_State.Show.Options.none)
+  val show_statistics_arg = JSON_Schema.Arg.default(
+    "show_statistics",
     "Each session's ML and the server's JVM statistics (heap, threads,...).",
     JSON_Schema.Format.bool, false)
 
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(
     List(PIDE_AI_Tool_Schema.running_sessions_arg, filter_origins_arg,
-      include_cmds_processing_arg, include_thy_status_arg, include_loaded_thys_arg,
-      include_session_dirs_arg, include_options_arg, include_statistics_arg))
+      show_cmds_processing_arg, show_dynamic_thys_arg, show_base_session_thys_arg,
+      show_session_dirs_arg, show_options_arg, show_statistics_arg))
 
   def handle(
     server: PIDE_AI_Server,
@@ -64,17 +64,17 @@ with PIDE_AI_Tool.Read_Only {
         error(s"Session(s) ${commas_quote(unknown)} of filter_origins not contained in " +
           s"selection ${commas_quote(selected_ids)}.")
       }
-      val include = PIDE_AI_Session_State.Include(
-        cmds_processing = include_cmds_processing_arg.get(args),
-        thy_status = include_thy_status_arg.get(args),
-        loaded_thys = include_loaded_thys_arg.get(args),
-        session_dirs = include_session_dirs_arg.get(args),
-        options = include_options_arg.get(args),
-        statistics = include_statistics_arg.get(args))
+      val show = PIDE_AI_Session_State.Show(
+        cmds_processing = show_cmds_processing_arg.get(args),
+        dynamic_thys = show_dynamic_thys_arg.get(args),
+        base_session_thys = show_base_session_thys_arg.get(args),
+        session_dirs = show_session_dirs_arg.get(args),
+        options = show_options_arg.get(args),
+        statistics = show_statistics_arg.get(args))
       JSON_Object("sessions" -> selected_sessions.map(session =>
-        PIDE_AI_Session_State.json(session, filter_origins.get(session.id), include,
+        PIDE_AI_Session_State.json(session, filter_origins.get(session.id), show,
           context.cwd))) ++
-      JSON_Object.if_proper(include.statistics,
+      JSON_Object.if_proper(show.statistics,
         PIDE_AI_Session_State.jvm_stats_json())
     }
 }

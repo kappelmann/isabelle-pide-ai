@@ -26,14 +26,14 @@ object Get_State_Tool {
     val stop_on_arg = JSON_Schema.Arg.default("stop_on", "",
       JSON_Schema.Format.enumeration(Stop_On.values), Stop_On.any_failed)
 
-    val include_summary_warnings_arg = JSON_Schema.Arg.default(
-      "include_summary_warnings", "", JSON_Schema.Format.bool, false)
+    val show_summary_warnings_arg = JSON_Schema.Arg.default(
+      "show_summary_warnings", "", JSON_Schema.Format.bool, false)
     val summary_problematic_limit_arg = JSON_Schema.Arg.optional(
       "summary_problematic_limit",
       "Problematic occurrences to return. Default: all.",
       JSON_Schema.Format.int(minimum = Some(0)))
-    val summary_snippet_lines_arg = JSON_Schema.Arg.default(
-      "summary_snippet_lines", "Number of source lines shown (0 for line ranges only).",
+    val snippet_lines_arg = JSON_Schema.Arg.default(
+      "snippet_lines", "Number of source lines shown (0 for line ranges only).",
       JSON_Schema.Format.int(minimum = Some(0)), 1)
     val details_arg = JSON_Schema.Arg.default(
       "details",
@@ -56,18 +56,18 @@ object Get_State_Tool {
       Time.seconds(default))
 
     def args(timeout_arg: JSON_Schema.Arg[Time]): List[JSON_Schema.Arg[?]] =
-      List(include_summary_warnings_arg, summary_problematic_limit_arg, summary_snippet_lines_arg,
+      List(show_summary_warnings_arg, summary_problematic_limit_arg, snippet_lines_arg,
         details_arg, details_problematic_limit_arg, details_unproblematic_limit_arg, timeout_arg,
         stop_on_arg)
 
     def from_json(args: JSON.Object.T, timeout_arg: JSON_Schema.Arg[Time]): Request = {
       val summary_message_kinds = PIDE_AI_Message.Message_Kind.errors ::
-        Option.when(include_summary_warnings_arg.get(args))(
+        Option.when(show_summary_warnings_arg.get(args))(
           PIDE_AI_Message.Message_Kind.warnings).toList
       Request(timeout_arg.get(args), stop_on_arg.get(args),
         PIDE_AI_Document_Command.States.Report(details_arg.get(args).toSet, summary_message_kinds,
           details_problematic_limit_arg.get(args), details_unproblematic_limit_arg.get(args),
-          summary_problematic_limit_arg.get(args), summary_snippet_lines_arg.get(args)))
+          summary_problematic_limit_arg.get(args), snippet_lines_arg.get(args)))
     }
   }
 

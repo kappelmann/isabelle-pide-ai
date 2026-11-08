@@ -18,7 +18,7 @@ object PIDE_AI_Tool_Util {
     sessions.running_sessions(session_ids) match {
       case List(session) => session
       case Nil => error(s"No running session. $available")
-      case _ => error(s"Multiple running sessions: specify ${quote("session")}. $available")
+      case _ => error(s"Multiple running sessions: specify session id. $available")
     }
   }
 

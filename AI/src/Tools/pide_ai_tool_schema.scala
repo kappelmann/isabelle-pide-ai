@@ -17,10 +17,10 @@ object PIDE_AI_Tool_Schema {
     "unresponsiveness or ROOT or base session updates."
 
   val running_session_arg = JSON_Schema.Arg.optional(
-    "session", "Running session id. Default: unique running one.",
+    "session_id", "Default: unique running one.",
     JSON_Schema.Format.string)
   val running_sessions_arg = JSON_Schema.Arg.optional(
-    "sessions", "Running session ids. Default: all running ones.",
+    "session_ids", "Default: all running ones.",
     JSON_Schema.Format.list(JSON_Schema.Format.string))
   val origin_arg = JSON_Schema.Arg.required("origin",
     s"Session-qualified theory (e.g. ${quote("HOL.Nat")}) or file path.",
