@@ -9,6 +9,7 @@ New in this PIDE AI version
 New in PIDE AI 2026
 ----------------------------
 
+* CLI client now takes arguments as `KEY=STRING` and `KEY:=JSON` besides a JSON object.
 * Command protocol requests now use MCP tools/call format. INCOMPATIBILITY.
 * CLI client now returns result on stdout, and progress and errors on stderr. INCOMPATIBILITY.
 * New `blocked_by` in states for theories that cannot be processed.
