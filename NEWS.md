@@ -58,7 +58,7 @@ New in PIDE AI 2026
 * `get_session_state`: `include_commands_running` is renamed to `include_cmds_processing`; `include_theory_status` to `include_thy_status`; `include_loaded_theories` to `include_loaded_thys`.
     Processing commands are grouped by origin. INCOMPATIBILITY.
 * `find_entities`: new `kinds` to select entity kinds. Results are grouped by definition site.
-* `create_scratch`: `extension` is renamed to `ext` with default `.thy`. Files are named `Scratch_<timestamp>`. INCOMPATIBILITY.
+* `create_scratch`: `extension` defaults to `.thy`. Files are named `Scratch_<timestamp>`. INCOMPATIBILITY.
 * Edits now decode automatically.
 * Add Isabelle/ML skill file.
 * Reading or editing a theory loads its unloaded files.

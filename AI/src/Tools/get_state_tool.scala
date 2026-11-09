@@ -48,7 +48,8 @@ object Get_State_Tool {
     "For a non-theory file, the state is that of the command loading it."
 
   object Request {
-    val stop_on_arg = JSON_Schema.Arg.default("stop_on", "",
+    val stop_on_arg = JSON_Schema.Arg.default("stop_on",
+      s"${quote(Stop_On.any_failed.toString)}=failure or all terminated.",
       JSON_Schema.Format.enumeration(Stop_On.values), Stop_On.any_failed)
 
     val show_summary_warnings_arg = JSON_Schema.Arg.default(
@@ -87,7 +88,7 @@ object Get_State_Tool {
       Show_Other_Cmds_Running.if_range_unterminated)
 
     def timeout_arg(default: Int) = JSON_Schema.Arg.default(
-      "timeout", "Seconds to wait.",
+      "timeout", "Seconds to wait for termination.",
       JSON_Schema.Format.int(minimum = Some(0)).map(Time.seconds(_), _.seconds.toInt),
       Time.seconds(default))
     val progress_delay_arg = JSON_Schema.Arg.optional("progress_delay",

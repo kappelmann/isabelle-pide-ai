@@ -17,7 +17,7 @@ class Create_Scratch_Tool extends PIDE_AI_Tool("create_scratch") {
     "name_suffix", "Label to identify the file. Default: auto-generated.",
     JSON_Schema.Format.string)
   val extension_arg = JSON_Schema.Arg.default(
-    "ext", "File extension.", JSON_Schema.Format.string, ".thy")
+    "extension", "", JSON_Schema.Format.string, ".thy")
 
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(
     List(PIDE_AI_Tool_Schema.running_session_arg, name_suffix_arg, extension_arg))
