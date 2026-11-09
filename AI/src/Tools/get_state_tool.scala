@@ -23,7 +23,7 @@ object Get_State_Tool {
 
   enum Show_Thys {
     case none, failed, not_ok, all
-    def select(statuses: => List[PIDE_AI_Theory.Status]): List[PIDE_AI_Theory.Status] =
+    def select(statuses: => List[PIDE_AI_Theory_Status]): List[PIDE_AI_Theory_Status] =
       this match {
         case `none` => Nil
         case `failed` => statuses.filter(_.is_failed)
@@ -155,8 +155,9 @@ object Get_State_Tool {
       val unterminated = states.exists(!_.command_status.is_terminated)
       lazy val dynamic_thys = PIDE_AI_Nodes.Loaded(resources, nodes).dynamic
       val thys = PIDE_AI_Nodes.node_theory(nodes, node_name).toList
-      def statuses(names: Set[Document.Node.Name]): List[PIDE_AI_Theory.Status] =
-        PIDE_AI_Theory.Statuses(snapshot, dynamic_thys.filter(names -- thys))
+      val blocked = PIDE_AI_Nodes.blocked_by(resources, snapshot)
+      def statuses(names: Set[Document.Node.Name]): List[PIDE_AI_Theory_Status] =
+        PIDE_AI_Theory_Status.Statuses(snapshot, dynamic_thys.filter(names -- thys))
       val ancestors = request.show_ancestor_thys.select(
         statuses(PIDE_AI_Dependencies.known_dependencies(resources, nodes, thys).toSet))
       val descendants =
@@ -175,10 +176,15 @@ object Get_State_Tool {
       states_json ++ JSON_Object.flatten(Option.when(edited > 0)(
         PIDE_AI_Document_Command.States.cmds_key("edited_omitted") -> edited),
         Option.when(timed_out)("timed_out" -> true),
+        Option.when(blocked.nonEmpty)("blocked_by" -> JSON_Object(blocked.map((name, header) =>
+          PIDE_AI_Origin.print(resources, name, cwd) ->
+            header.errors.map(_.text(session.unicode_symbols, cwd))))),
         Option.when(ancestors.nonEmpty)(
-          "ancestors" -> PIDE_AI_Theory.Statuses.json(resources, ancestors, cwd)),
+          "ancestors" -> PIDE_AI_Theory_Status.Statuses.json(resources, ancestors,
+            session.unicode_symbols, cwd)),
         Option.when(descendants.nonEmpty)(
-          "descendants" -> PIDE_AI_Theory.Statuses.json(resources, descendants, cwd)),
+          "descendants" -> PIDE_AI_Theory_Status.Statuses.json(resources, descendants,
+            session.unicode_symbols, cwd)),
         Option.when(other_cmds_running.nonEmpty)(
           other_cmds_running_key -> other_cmds_running))
     }
@@ -188,7 +194,9 @@ object Get_State_Tool {
     else {
       val (snapshot, states, edited, timed_out) =
         PIDE_AI_Document_Command.await_states(session, snapshot0, selection,
-          request.stop_on.stop, Some((request.timeout - (Time.now() - start)) max Time.zero),
+          (snapshot, statuses) => request.stop_on.stop(statuses) ||
+            PIDE_AI_Nodes.blocked_by(resources, snapshot.switch(node_name)).nonEmpty,
+          Some((request.timeout - (Time.now() - start)) max Time.zero),
           get_state_delay(session.options), get_state_check_factor(session.options),
           (snapshot, states) => JSON.Format(json(snapshot, states.toList, 0, false)),
           request.progress_delay.getOrElse(get_state_progress_delay(session.options)), progress)

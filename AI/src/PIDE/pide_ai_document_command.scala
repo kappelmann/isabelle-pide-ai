@@ -404,7 +404,7 @@ object PIDE_AI_Document_Command {
   def await(
     session: PIDE_AI_Session,
     commands: List[Command],
-    stop: List[Document_Status.Command_Status] => Boolean,
+    stop: (Document.Snapshot, List[Document_Status.Command_Status]) => Boolean,
     timeout: Option[Time],
     delay: Time,
     check_factor: Double,
@@ -436,7 +436,7 @@ object PIDE_AI_Document_Command {
           .partition(_._2.is_terminated)
       pending = still_pending.map(_._1)
       terminated = now_terminated.map(_._2) ::: terminated
-      val stopped = stop(still_pending.map(_._2) ::: terminated)
+      val stopped = stop(snapshot, still_pending.map(_._2) ::: terminated)
       val now = Time.now()
       wait = delay max (now - check_start).scale(check_factor)
       timeout.foreach(t => wait = wait min (start + t - now))
@@ -449,7 +449,7 @@ object PIDE_AI_Document_Command {
     session: PIDE_AI_Session,
     snapshot: Document.Snapshot,
     selection: Selection,
-    stop: List[Document_Status.Command_Status] => Boolean,
+    stop: (Document.Snapshot, List[Document_Status.Command_Status]) => Boolean,
     timeout: Option[Time],
     delay: Time,
     check_factor: Double,

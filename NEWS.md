@@ -9,6 +9,7 @@ New in this PIDE AI version
 New in PIDE AI 2026
 ----------------------------
 
+* New `blocked_by` in states for theories that cannot be processed.
 * Key `cmds_bad` is renamed to `bad` and `occurrences` to `items`. `cmds_processing` lists `long_running` commands with source and timing, the rest as `short_running_lines`. INCOMPATIBILITY.
 * New state tool summary reports. 
 * `get_state`: new `show_ancestor_thys`, `show_descendant_thys`, and `show_other_cmds_processing`.

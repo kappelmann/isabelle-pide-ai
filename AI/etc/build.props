@@ -41,7 +41,7 @@ sources = \
   src/PIDE/pide_ai_session_spec.scala \
   src/PIDE/pide_ai_session_state.scala \
   src/PIDE/pide_ai_sessions.scala \
-  src/PIDE/pide_ai_theory.scala \
+  src/PIDE/pide_ai_theory_status.scala \
   src/Server/pide_ai_client_connector.scala \
   src/Server/pide_ai_client_context.scala \
   src/Server/pide_ai_client_handler.scala \
