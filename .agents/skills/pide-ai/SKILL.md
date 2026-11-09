@@ -4,8 +4,7 @@ description: Using the Isabelle proof assistant with PIDE AI/PIDE MCP. Use this 
 ---
 
 PIDE AI's tools and services (extensions) are customisable. Some named below may be unavailable. Also load skills of extensions.
-Call tools via MCP or CLI `pide_ai_cli -?`. `list_extensions '{"show_input_schema":true}'` lists tools.
-Unlike MCP, CLI can show progress and you can filter output (e.g. with jq).
+Call tools via MCP or CLI `pide_ai_cli -?`. Unlike MCP, CLI can show progress and you can filter output (e.g. with jq).
 Paths are relative to a working directory (MCP: dir at connection, CLI: CWD).
 
 ## Sessions

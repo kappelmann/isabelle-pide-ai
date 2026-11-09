@@ -14,6 +14,7 @@ function usage()
   echo "  Options are:" >&2
   echo "    -p           report progress" >&2
   echo >&2
+  echo "  Prints result on stdout, progress and errors on stderr. Exits 1 on error." >&2
   echo "  list_extensions '{\"show_input_schema\":true}' lists tools with their arguments." >&2
   echo >&2
   exit 2
@@ -44,12 +45,14 @@ exec 3<>"/dev/tcp/127.0.0.1/$PORT" || exit 2
 printf 'cmd %s\n{"name":"%s","arguments":%s%s}\n' "$PWD" "$TOOL" "$JSON" "$META" >&3
 IFS= read -r FIRST <&3
 if [ "$FIRST" != OK ]; then
-  [ -z "$FIRST" ] || printf '%s\n' "$FIRST"
+  [ -z "$FIRST" ] || printf '%s\n' "$FIRST" >&2
   exit 1
 fi
 RC=1
 while IFS= read -r LINE <&3 || [ -n "$LINE" ]; do
-  printf '%s\n' "$LINE"
-  case "$LINE" in '{"result":'*) RC=0 ;; esac
+  case "$LINE" in
+    '{"result":'*) printf '%s\n' "$LINE"; RC=0 ;;
+    *) printf '%s\n' "$LINE" >&2 ;;
+  esac
 done
 exit "$RC"

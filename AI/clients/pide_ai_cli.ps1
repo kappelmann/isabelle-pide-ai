@@ -11,6 +11,7 @@ Usage: pide_ai_cli PORT [OPTIONS] TOOL [JSON]
   Options are:
     -p           report progress
 
+  Prints result on stdout, progress and errors on stderr. Exits 1 on error.
   list_extensions '{"show_input_schema":true}' lists tools with their arguments.
 
 '@)
@@ -46,14 +47,14 @@ $stream.Write($request, 0, $request.Length)
 $reader = [System.IO.StreamReader]::new($stream, $utf8)
 $first = $reader.ReadLine()
 if ($first -ne 'OK') {
-  if ($null -ne $first) { $first }
+  if ($null -ne $first) { [Console]::Error.WriteLine($first) }
   $client.Close()
   exit 1
 }
 $rc = 1
 while ($null -ne ($line = $reader.ReadLine())) {
-  $line
-  if ($line.StartsWith('{"result":')) { $rc = 0 }
+  if ($line.StartsWith('{"result":')) { $line; $rc = 0 }
+  else { [Console]::Error.WriteLine($line) }
 }
 $client.Close()
 exit $rc
