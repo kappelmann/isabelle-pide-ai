@@ -11,14 +11,14 @@ import scala.collection.immutable.VectorMap
 object PIDE_AI_Sessions {
   def build_delay(options: Options): Time = options.seconds("build_delay")
 
-  sealed case class Session_Event(session: PIDE_AI_Session, progress: Progress)
+  sealed case class Session_Event(session: PIDE_AI_Session, progress: PIDE_AI_Progress)
   type Session_Hooks = Lifecycle_Hooks[Session_Event, Session_Event]
 }
 
 class PIDE_AI_Sessions(
   hooks: PIDE_AI_Sessions.Session_Hooks,
   val log: Logger,
-  val base_progress: Progress,
+  val base_progress: PIDE_AI_Progress,
   val options: Options
 ) {
   private val build_lock = new Queue_Lock
@@ -67,17 +67,17 @@ class PIDE_AI_Sessions(
     val id: String,
     base_options: Options,
     spec: PIDE_AI_Session_Spec,
-    caller_progress: Progress
+    caller_progress: PIDE_AI_Progress
   ) extends Task[Unit] {
     val started = Future.promise[PIDE_AI_Session]
     private val start_progress = new Sub_Progress(caller_progress)
     private val built = Synchronized(false)
-    private val stop_request = Synchronized[Option[Progress]](None)
+    private val stop_request = Synchronized[Option[PIDE_AI_Progress]](None)
     private val terminated = Synchronized(false)
 
     def stopping: Boolean = stop_request.value.isDefined
 
-    def request_stop(progress: Progress): Unit = {
+    def request_stop(progress: PIDE_AI_Progress): Unit = {
       stop_request.change(_.orElse(Some(progress)))
       start_progress.stop()
     }
@@ -91,7 +91,10 @@ class PIDE_AI_Sessions(
     def running: Option[PIDE_AI_Session] =
       if (stopping) None else started.peek.collect { case Exn.Res(session) => session }
 
-    private def shutdown(session: Option[PIDE_AI_Session], progress: Progress): Exn.Result[Unit] = {
+    private def shutdown(
+      session: Option[PIDE_AI_Session],
+      progress: PIDE_AI_Progress
+    ): Exn.Result[Unit] = {
       val result = Exn.capture {
         for (session <- session) {
           Exn.capture { log(s"Stopping PIDE session ${quote(id)}...") }
@@ -181,7 +184,7 @@ class PIDE_AI_Sessions(
   def start_session(
     base_options: Options,
     spec: PIDE_AI_Session_Spec,
-    progress: Progress
+    progress: PIDE_AI_Progress
   ): PIDE_AI_Session = {
     val entry = state.change_result { entries =>
       val session_id = spec.id.getOrElse(fresh_id(spec.logic, entries))
@@ -202,7 +205,7 @@ class PIDE_AI_Sessions(
   def start_session_reporting_build_status(
     base_options: Options,
     spec: PIDE_AI_Session_Spec,
-    progress: Progress
+    progress: PIDE_AI_Progress
   ): PIDE_AI_Session = {
     val options = base_options ++ spec.options
     start_session(base_options, spec,
@@ -212,7 +215,7 @@ class PIDE_AI_Sessions(
         log = log))
   }
 
-  def stop_sessions(session_ids: Option[List[String]], progress: Progress): List[String] = {
+  def stop_sessions(session_ids: Option[List[String]], progress: PIDE_AI_Progress): List[String] = {
     val entries = state.value
     val selected = session_ids match {
       case None => entries.toList

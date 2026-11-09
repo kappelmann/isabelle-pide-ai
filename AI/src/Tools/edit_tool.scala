@@ -30,7 +30,7 @@ object Edit_Tool {
     session: PIDE_AI_Session,
     node_name: Document.Node.Name,
     request: Request,
-    progress: Progress,
+    progress: PIDE_AI_Progress,
     cwd: Option[Path]
   ): List[(Int, Int)] = {
     if (PIDE_AI_Nodes.is_base_session_theory(session.resources, node_name))
@@ -107,7 +107,7 @@ object Edit_Tool {
     session: PIDE_AI_Session,
     node_name: Document.Node.Name,
     args: JSON.Object.T,
-    progress: Progress,
+    progress: PIDE_AI_Progress,
     cwd: Option[Path]
   ): (List[(Int, Int)], JSON.Object.T) = {
     def pide_text(arg: JSON_Schema.Arg[String]): String =
@@ -141,7 +141,7 @@ class Edit_Tool extends PIDE_AI_Tool("edit") with PIDE_AI_Tool.Destructive {
   def handle(
     server: PIDE_AI_Server,
     args: JSON.Object.T,
-    progress: Progress,
+    progress: PIDE_AI_Progress,
     context: PIDE_AI_Client_Context
   ): PIDE_AI_Tool_Result =
     PIDE_AI_Tool_Result.result {

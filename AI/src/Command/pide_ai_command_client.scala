@@ -10,14 +10,14 @@ object PIDE_AI_Command_Client {
   def read_response(
     connection: Line_Connection,
     tool_id: String,
-    progress: Progress
+    progress: PIDE_AI_Progress
   ): PIDE_AI_Tool_Result = {
     var result: Option[PIDE_AI_Tool_Result] = None
     for (line <- connection.read_lines()) {
       def bad(): Nothing = error(s"Bad response to ${quote(tool_id)}: $line")
       if (result.isDefined) bad()
       JSON.Format.unapply(line) match {
-        case Some(PIDE_AI_Command.progress_response(message)) => progress.echo(message)
+        case Some(PIDE_AI_Command.progress_response(message)) => progress.echo_json(message)
         case Some(PIDE_AI_Command.result_response(res)) => result = Some(res)
         case _ => bad()
       }
@@ -29,7 +29,7 @@ object PIDE_AI_Command_Client {
     connection: Line_Connection,
     tool_id: String,
     args: JSON.Object.T,
-    progress: Progress
+    progress: PIDE_AI_Progress
   ): PIDE_AI_Tool_Result = {
     connection.write_line(JSON.Format(MCP.Tool_Call(tool_id, args, Some(1L)).json))
     read_response(connection, tool_id, progress)

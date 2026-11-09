@@ -18,7 +18,7 @@ class Queue_Lock {
   def waiting: Int = queue.value.length
 
   def with_lock[A](
-    progress: Progress,
+    progress: PIDE_AI_Progress,
     message: Time => String,
     delay: Time,
     progress_delay: Time

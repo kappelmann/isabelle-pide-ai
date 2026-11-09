@@ -10,7 +10,7 @@ class PIDE_AI_Tool_Call(
   server: PIDE_AI_Server,
   val tool: PIDE_AI_Tool,
   val tool_call: MCP.Tool_Call,
-  progress: Progress,
+  progress: PIDE_AI_Progress,
   log: Logger,
   context: PIDE_AI_Client_Context
 ) extends Progress_Task[PIDE_AI_Tool_Result](progress) {

@@ -27,11 +27,11 @@ object PIDE_AI_Session {
     options.seconds("pide_ai_build_report_nodes_status_delay")
 
   def reporting_build_status_progress(
-    progress: Progress,
+    progress: PIDE_AI_Progress,
     delay: Time,
     long_running_threshold: Time,
     log: Logger
-  ): Progress = {
+  ): PIDE_AI_Progress = {
     val report = new Throttle[Progress.Nodes_Status](delay, log)(status =>
       progress.output(
         PIDE_AI_Progress.progress_long_running_output(long_running_threshold)(status)))
@@ -42,7 +42,7 @@ object PIDE_AI_Session {
   def build(
     base_options: Options,
     spec: PIDE_AI_Session_Spec,
-    progress: Progress
+    progress: PIDE_AI_Progress
   ): (Options, Sessions.Background) = {
     val options = base_options ++ spec.options
     val session_background = Sessions.background(options, spec.logic,
@@ -65,7 +65,7 @@ object PIDE_AI_Session {
     options: Options,
     session_background: Sessions.Background,
     log: Logger,
-    progress: Progress
+    progress: PIDE_AI_Progress
   ): PIDE_AI_Session = {
     val id = spec.id.getOrElse(error("Missing session id"))
     val resources = PIDE_AI_Headless.Resources(options, session_background, log)
@@ -112,7 +112,7 @@ class PIDE_AI_Session private(
   def directories(): List[Path] = Sessions.directories(dirs, Nil).map(_._2)
 
   private val lock = new Queue_Lock
-  def with_lock[A](progress: Progress)(body: => A): A =
+  def with_lock[A](progress: PIDE_AI_Progress)(body: => A): A =
     lock.with_lock(progress,
       elapsed => "Awaiting session lock " + PIDE_AI_Progress.elapsed_text(elapsed),
       PIDE_AI_Session.poll_delay(options), PIDE_AI_Session.progress_delay(options))(body)
@@ -169,8 +169,8 @@ class PIDE_AI_Session private(
         s"Its session phase is ${quote(session.phase.print)}")
 
   def await_while_ready[A](
-    progress: Progress,
-    message: Time => String,
+    progress: PIDE_AI_Progress,
+    message: Time => JSON.T,
     delay: => Time,
     progress_delay: Time
   )(value: => Option[A]): A =
@@ -181,7 +181,7 @@ class PIDE_AI_Session private(
 
   def tip_change: Document.Change = session.get_state().history.tip
 
-  def await_stable(change: Document.Change, progress: Progress): Unit =
+  def await_stable(change: Document.Change, progress: PIDE_AI_Progress): Unit =
     await_while_ready(progress,
       elapsed => "Awaiting stable snapshot " + PIDE_AI_Progress.elapsed_text(elapsed),
       PIDE_AI_Session.poll_delay(options), PIDE_AI_Session.progress_delay(options)) {
@@ -208,7 +208,7 @@ class PIDE_AI_Session private(
     }
   }
 
-  def tip_version(progress: Progress): Document.Version = {
+  def tip_version(progress: PIDE_AI_Progress): Document.Version = {
     progress.expose_interrupt()
     val version = session.get_state().history.tip.version
     await_while_ready(progress,
@@ -243,7 +243,7 @@ class PIDE_AI_Session private(
     node_name: Document.Node.Name,
     change: Document.Node.Overlays => Document.Node.Overlays,
     require_theory: Boolean,
-    progress: Progress
+    progress: PIDE_AI_Progress
   ): Future[Unit] = {
     def edit(): Unit = {
       require_ready()
@@ -275,7 +275,7 @@ class PIDE_AI_Session private(
     command: Command,
     fn: String,
     args: List[String],
-    progress: Progress
+    progress: PIDE_AI_Progress
   ): Future[Unit] =
     edit_overlays(command.node_name, _.insert(command, fn, args), require_theory = true, progress)
 
@@ -283,16 +283,16 @@ class PIDE_AI_Session private(
     command: Command,
     fn: String,
     args: List[String],
-    progress: Progress
+    progress: PIDE_AI_Progress
   ): Future[Unit] =
     edit_overlays(command.node_name, _.remove(command, fn, args), require_theory = false, progress)
 
-  def editor(progress: Progress): PIDE_AI_Editor = new PIDE_AI_Editor(this, progress)
+  def editor(progress: PIDE_AI_Progress): PIDE_AI_Editor = new PIDE_AI_Editor(this, progress)
 
   def read_update(
     nodes: List[(Document.Node.Name, Option[List[(Int, Option[Int])]])],
     hide_others: Boolean,
-    progress: Progress
+    progress: PIDE_AI_Progress
   ): (Map[Document.Node.Name, String], Document.Change) = {
     val (models, change) = with_lock(progress) {
       val version = tip_version(progress)
@@ -309,7 +309,7 @@ class PIDE_AI_Session private(
 
   def sync(
     node_names: List[Document.Node.Name],
-    progress: Progress
+    progress: PIDE_AI_Progress
   ): (Map[Document.Node.Name, String], Document.Change) =
     with_lock(progress) {
       val nodes = tip_version(progress).nodes
@@ -318,7 +318,10 @@ class PIDE_AI_Session private(
         hide_others = false, progress = progress)
     }
 
-  def sync_resolve(node_names: List[Document.Node.Name], progress: Progress): Document.Change =
+  def sync_resolve(
+    node_names: List[Document.Node.Name],
+    progress: PIDE_AI_Progress
+  ): Document.Change =
     with_lock(progress) {
       sync(node_names, progress)
       resolve_dependencies(node_names, progress)
@@ -327,7 +330,7 @@ class PIDE_AI_Session private(
 
   def sync_dependencies_resolve(
     node_names: List[Document.Node.Name],
-    progress: Progress
+    progress: PIDE_AI_Progress
   ): Document.Change =
     with_lock(progress) {
       sync_resolve(PIDE_AI_Dependencies.known_dependencies(resources,
@@ -336,7 +339,7 @@ class PIDE_AI_Session private(
 
   def sync_loaded_resolve(
     node_names: List[Document.Node.Name],
-    progress: Progress
+    progress: PIDE_AI_Progress
   ): Document.Change =
     with_lock(progress) {
       val (texts, _) = sync(node_names, progress)
@@ -349,7 +352,7 @@ class PIDE_AI_Session private(
     visible_lines: List[(Int, Option[Int])],
     await_stable_before_resolve: Boolean,
     hide_others: Boolean,
-    progress: Progress
+    progress: PIDE_AI_Progress
   ): String = {
     if (is_base_session_theory(node_name)) node_snapshot(node_name).node.source
     else {
@@ -363,7 +366,7 @@ class PIDE_AI_Session private(
 
   def resolve_dependencies(
     node_names: List[Document.Node.Name],
-    progress: Progress
+    progress: PIDE_AI_Progress
   ): Unit = {
     @tailrec def loop(seen: Set[Document.Node.Name], node_names: List[Document.Node.Name]): Unit = {
       val names = PIDE_AI_Dependencies.unloaded_dependencies(session,
@@ -378,7 +381,7 @@ class PIDE_AI_Session private(
 
   def unload(
     node_names: List[Document.Node.Name],
-    progress: Progress
+    progress: PIDE_AI_Progress
   ): (List[Document.Node.Name], Document.Change) = {
     for (name <- node_names if is_base_session_theory(name))
       error(s"Cannot unload base session theory ${quote(print_origin(name, None))}")

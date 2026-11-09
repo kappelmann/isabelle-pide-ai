@@ -30,7 +30,7 @@ class PIDE_MCP_Endpoint(
     case Tool_Progress(id: JSON_RPC.Id,
       token: MCP.Progress_Token,
       serial: Long,
-      message: String
+      message: JSON.T
     ) extends Event
     case Tool_Result(id: JSON_RPC.Id, result: PIDE_AI_Tool_Result) extends Event
   }
@@ -147,7 +147,8 @@ class PIDE_MCP_Endpoint(
           tool_call_scope.stop()
         case Event.Tool_Progress(id, token, serial, message) =>
           require(tool_calls.isDefinedAt(id), s"Active tool call expected: ${JSON.Format(id)}")
-          if (!cancelled(id)) respond(MCP.progress_notification(token, serial, message))
+          if (!cancelled(id))
+            respond(MCP.progress_notification(token, serial, JSON_Object.text(message)))
         case Event.Tool_Result(id, tool_result) =>
           require(tool_calls.isDefinedAt(id), s"Active tool call expected: ${JSON.Format(id)}")
           tool_calls -= id

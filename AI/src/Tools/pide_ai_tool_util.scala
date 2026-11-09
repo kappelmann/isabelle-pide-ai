@@ -38,7 +38,7 @@ object PIDE_AI_Tool_Util {
   def require_node_snapshot(
     session: PIDE_AI_Session,
     node_name: Document.Node.Name,
-    progress: Progress,
+    progress: PIDE_AI_Progress,
     cwd: Option[Path]
   ): Document.Snapshot = {
     def origin = quote(session.print_origin(node_name, cwd))
@@ -62,7 +62,7 @@ object PIDE_AI_Tool_Util {
   def require_stable_node_snapshot(
     session: PIDE_AI_Session,
     node_name: Document.Node.Name,
-    progress: Progress,
+    progress: PIDE_AI_Progress,
     cwd: Option[Path]
   ): Document.Snapshot = {
     session.await_stable(session.sync_dependencies_resolve(List(node_name), progress), progress)

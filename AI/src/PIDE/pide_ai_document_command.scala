@@ -411,9 +411,9 @@ object PIDE_AI_Document_Command {
     timeout: Option[Time],
     delay: Time,
     check_factor: Double,
-    message: Document.Snapshot => String,
+    message: Document.Snapshot => JSON.T,
     progress_delay: Time,
-    progress: Progress
+    progress: PIDE_AI_Progress
   ): (Document.Snapshot, List[Command], List[Command], Boolean) = {
     val start = Time.now()
     var snapshot = session.snapshot()
@@ -456,9 +456,9 @@ object PIDE_AI_Document_Command {
     timeout: Option[Time],
     delay: Time,
     check_factor: Double,
-    message: (Document.Snapshot, Iterator[State]) => String,
+    message: (Document.Snapshot, Iterator[State]) => JSON.T,
     progress_delay: Time,
-    progress: Progress
+    progress: PIDE_AI_Progress
   ): (Document.Snapshot, Iterator[State], Int, Boolean) = {
     def node_states(snapshot1: Document.Snapshot): (Document.Snapshot, Iterator[State]) = {
       val node_snapshot = session.switch(snapshot1, snapshot.node_name)

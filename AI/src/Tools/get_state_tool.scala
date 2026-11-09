@@ -130,7 +130,7 @@ object Get_State_Tool {
     start_line: Int,
     opt_end_line: Option[Int],
     request: Request,
-    progress: Progress,
+    progress: PIDE_AI_Progress,
     cwd: Option[Path]
   ): JSON.Object.T = {
     val start = Time.now()
@@ -198,7 +198,7 @@ object Get_State_Tool {
             PIDE_AI_Nodes.blocked_by(resources, snapshot.switch(node_name)).nonEmpty,
           Some((request.timeout - (Time.now() - start)) max Time.zero),
           get_state_delay(session.options), get_state_check_factor(session.options),
-          (snapshot, states) => JSON.Format(json(snapshot, states.toList, 0, false)),
+          (snapshot, states) => json(snapshot, states.toList, 0, false),
           request.progress_delay.getOrElse(get_state_progress_delay(session.options)), progress)
       json(snapshot, states.toList, edited, timed_out)
     }
@@ -220,7 +220,7 @@ class Get_State_Tool extends PIDE_AI_Tool("get_state") with PIDE_AI_Tool.Read_On
   def handle(
     server: PIDE_AI_Server,
     args: JSON.Object.T,
-    progress: Progress,
+    progress: PIDE_AI_Progress,
     context: PIDE_AI_Client_Context
   ): PIDE_AI_Tool_Result =
     PIDE_AI_Tool_Result.result {

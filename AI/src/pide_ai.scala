@@ -18,7 +18,7 @@ object PIDE_AI {
     val options: Options,
     val specs: List[PIDE_AI_Session_Spec],
     val port: Option[Int],
-    val progress: Progress,
+    val progress: PIDE_AI_Progress,
     val client_context: PIDE_AI_Client_Context,
     val log: Logger,
     val message_log: Logger
@@ -54,7 +54,7 @@ object PIDE_AI {
       val server = client_connector.remote
       val scope = new Task_Scope[Task[?]]
 
-      def start_session(spec: PIDE_AI_Session_Spec, progress: Progress): Unit = {
+      def start_session(spec: PIDE_AI_Session_Spec, progress: PIDE_AI_Progress): Unit = {
         val result =
           try {
             using(client_connector.connect(PIDE_AI_Command_Protocol, client_context)) {

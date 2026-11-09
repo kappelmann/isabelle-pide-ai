@@ -14,7 +14,7 @@ object Stop_Server_Tool extends PIDE_AI_Tool("stop_server") {
   def handle(
     server: PIDE_AI_Server,
     args: JSON.Object.T,
-    progress: Progress,
+    progress: PIDE_AI_Progress,
     context: PIDE_AI_Client_Context
   ): PIDE_AI_Tool_Result = {
     server.stop()

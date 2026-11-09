@@ -9,6 +9,8 @@ New in this PIDE AI version
 New in PIDE AI 2026
 ----------------------------
 
+* Command protocol requests now use MCP tools/call format. INCOMPATIBILITY.
+* CLI client now returns result on stdout, and progress and errors on stderr. INCOMPATIBILITY.
 * New `blocked_by` in states for theories that cannot be processed.
 * Key `cmds_bad` is renamed to `bad` and `occurrences` to `items`. `cmds_processing` lists `long_running` commands with source and timing, the rest as `short_running_lines`. INCOMPATIBILITY.
 * New state tool summary reports. 

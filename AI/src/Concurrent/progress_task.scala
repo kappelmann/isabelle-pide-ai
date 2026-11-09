@@ -8,6 +8,6 @@ package isabelle.pide.ai
 
 import isabelle._
 
-abstract class Progress_Task[A](val progress: Progress) extends Task[A] {
+abstract class Progress_Task[A](val progress: PIDE_AI_Progress) extends Task[A] {
   def stop(): Unit = progress.stop()
 }

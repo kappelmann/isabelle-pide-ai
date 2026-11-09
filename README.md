@@ -118,7 +118,7 @@ AI/clients/pide_ai_cli 1234 list_extensions '{"show_input_schema": true}' # or p
 Stop the server by stopping the process (Ctrl-C) or via the client `AI/clients/pide_ai_cli 1234 stop_server`.
 
 **Note:**
-- Unlike in MCP, agents see the progress of tool calls (e.g. session builds) and can filter results before reading them,
+- Unlike in MCP, agents can see the progress of tool calls and filter results before reading them,
     which can improve token usage. Installation of a JSON processor (e.g. [jq](https://jqlang.org)) is recommended.
 - Your agent needs the port. Tell it, or, if it is also connected via MCP using `pide_mcp -p PORT` (see below), it finds the port and clients in its MCP instructions.
 

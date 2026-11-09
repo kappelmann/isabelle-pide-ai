@@ -10,7 +10,7 @@ object PIDE_AI_Editor {
   sealed case class Context(node_name: Document.Node.Name, offset: Text.Offset)
 }
 
-class PIDE_AI_Editor(mcp_session: PIDE_AI_Session, progress: Progress) extends Editor {
+class PIDE_AI_Editor(mcp_session: PIDE_AI_Session, progress: PIDE_AI_Progress) extends Editor {
   type Context = PIDE_AI_Editor.Context
   type Session = PIDE_AI_Headless.Session
 

@@ -21,7 +21,7 @@ object PIDE_AI_Service extends PIDE_AI_Registry.Kind[PIDE_AI_Service, PIDE_AI_Se
   sealed case class Session_Event(
     server: PIDE_AI_Server,
     session: PIDE_AI_Session,
-    progress: Progress)
+    progress: PIDE_AI_Progress)
 }
 
 abstract class PIDE_AI_Service(val id: String)

@@ -37,7 +37,7 @@ abstract class PIDE_AI_Tool(id: String) extends PIDE_AI_Service(id) {
   def handle(
     server: PIDE_AI_Server,
     args: JSON.Object.T,
-    progress: Progress,
+    progress: PIDE_AI_Progress,
     context: PIDE_AI_Client_Context
   ): PIDE_AI_Tool_Result
 }

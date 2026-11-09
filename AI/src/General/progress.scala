@@ -14,8 +14,8 @@ object PIDE_AI_Progress {
   def elapsed_text(elapsed: Time): String = s"(${elapsed.message} elapsed)"
 
   def await[A](
-    progress: Progress,
-    message: Time => String,
+    progress: PIDE_AI_Progress,
+    message: Time => JSON.T,
     progress_delay: Time
   )(attempt: => Option[A]): A = {
     val start = Time.now()
@@ -28,7 +28,7 @@ object PIDE_AI_Progress {
           val limit1 =
             if (now < limit) limit
             else {
-              progress.echo(message(now - start))
+              progress.echo_json(message(now - start))
               now + progress_delay
             }
           poll(limit1)
@@ -38,8 +38,8 @@ object PIDE_AI_Progress {
   }
 
   def await_delay[A](
-    progress: Progress,
-    message: Time => String,
+    progress: PIDE_AI_Progress,
+    message: Time => JSON.T,
     delay: => Time,
     progress_delay: Time
   )(value: => Option[A]): A =
@@ -47,8 +47,8 @@ object PIDE_AI_Progress {
 
   def await_guarded[S, A](
     state: Synchronized[S],
-    progress: Progress,
-    message: Time => String,
+    progress: PIDE_AI_Progress,
+    message: Time => JSON.T,
     delay: Time,
     progress_delay: Time
   )(value: S => Option[A]): A =
@@ -77,7 +77,11 @@ object PIDE_AI_Progress {
     theories_progress_msg(status).toList ::: long_running_output(threshold)(status)
 }
 
-abstract class Wrapped_Progress(progress: Progress) extends Progress {
+class PIDE_AI_Progress extends Progress {
+  def echo_json(json: JSON.T): Unit = echo(JSON_Object.text(json))
+}
+
+abstract class Wrapped_Progress(progress: PIDE_AI_Progress) extends PIDE_AI_Progress {
   override def now(): Date = progress.now()
   override def verbose: Boolean = progress.verbose
   override def stopped: Boolean = progress.stopped
@@ -85,14 +89,16 @@ abstract class Wrapped_Progress(progress: Progress) extends Progress {
   override def interrupt_handler[A](e: => A): A = progress.interrupt_handler(e)
   override def output(messages: Progress.Output): Unit = progress.output(messages)
   override def nodes_status(status: Progress.Nodes_Status): Unit = progress.nodes_status(status)
+  override def echo_json(json: JSON.T): Unit = progress.echo_json(json)
 }
 
-class Silent_Progress(progress: Progress) extends Wrapped_Progress(progress) {
+class Silent_Progress(progress: PIDE_AI_Progress) extends Wrapped_Progress(progress) {
   override def output(messages: Progress.Output): Unit = ()
+  override def echo_json(json: JSON.T): Unit = ()
   override def nodes_status(status: Progress.Nodes_Status): Unit = ()
 }
 
-class Recode_Progress(progress: Progress, unicode_symbols: Boolean)
+class Recode_Progress(progress: PIDE_AI_Progress, unicode_symbols: Boolean)
 extends Wrapped_Progress(progress) {
   override def output(messages: Progress.Output): Unit =
     super.output(messages.map {
@@ -101,16 +107,17 @@ extends Wrapped_Progress(progress) {
     })
 }
 
-class Sub_Progress(progress: Progress) extends Wrapped_Progress(progress) {
+class Sub_Progress(progress: PIDE_AI_Progress) extends Wrapped_Progress(progress) {
   @volatile private var is_stopped = false
   override def stop(): Unit = { is_stopped = true }
   override def stopped: Boolean = is_stopped || progress.stopped
 }
 
 class Reporting_Progress(
-  progress: Progress,
+  progress: PIDE_AI_Progress,
   report_output: Progress.Output => Unit = _ => (),
-  report_nodes_status: Progress.Nodes_Status => Unit = _ => ()
+  report_nodes_status: Progress.Nodes_Status => Unit = _ => (),
+  report_json: JSON.T => Unit = _ => ()
 ) extends Wrapped_Progress(progress) {
   private var reporting = true
 
@@ -125,15 +132,20 @@ class Reporting_Progress(
     super.nodes_status(status)
     if (reporting) report_nodes_status(status)
   }
+
+  override def echo_json(json: JSON.T): Unit = synchronized {
+    super.echo_json(json)
+    if (reporting) report_json(json)
+  }
 }
 
-class Unstoppable_Progress(progress: Progress) extends Wrapped_Progress(progress) {
+class Unstoppable_Progress(progress: PIDE_AI_Progress) extends Wrapped_Progress(progress) {
   override def stopped: Boolean = false
   override def stop(): Unit = ()
   override def interrupt_handler[A](e: => A): A = e
 }
 
-class Tee_Progress(progresses: Progress*) extends Progress {
+class Tee_Progress(progresses: Progress*) extends PIDE_AI_Progress {
   override def verbose: Boolean = progresses.exists(_.verbose)
   override def output(messages: Progress.Output): Unit = progresses.foreach(_.output(messages))
   override def nodes_status(status: Progress.Nodes_Status): Unit =

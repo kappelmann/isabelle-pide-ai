@@ -37,9 +37,10 @@ $json = if ($rest.Count -eq 2) { $rest[1] } else { '{}' }
 $json = $json -replace "`r", ''
 $json = $json -replace "`n", ' '
 
+$utf8 = [System.Text.UTF8Encoding]::new($false)
+[Console]::OutputEncoding = $utf8
 try { $client = [System.Net.Sockets.TcpClient]::new('127.0.0.1', $port) }
 catch { [Console]::Error.WriteLine($_.Exception.Message); exit 2 }
-$utf8 = [System.Text.UTF8Encoding]::new($false)
 $stream = $client.GetStream()
 $cwd = (Get-Location).ProviderPath
 $request = $utf8.GetBytes("cmd $cwd`n{`"name`":`"$tool`",`"arguments`":$json$meta}`n")

@@ -17,7 +17,7 @@ object PIDE_AI_Command {
       case _ => error("Bad request: expected JSON object")
     }
 
-  val progress_response = JSON_Schema.Format.property("progress", JSON_Schema.Format.string)
+  val progress_response = JSON_Schema.Format.property("progress", JSON_Schema.Format.any)
   val result_response: JSON_Schema.Format[PIDE_AI_Tool_Result] =
     JSON_Schema.Format.result(JSON_Schema.Format.property("result", JSON_Schema.Format.any),
       JSON_Schema.Format.property("error", JSON_Schema.Format.any))

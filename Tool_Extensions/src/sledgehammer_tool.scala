@@ -63,7 +63,7 @@ class Sledgehammer_Tool extends PIDE_AI_Tool("sledgehammer") with PIDE_AI_Tool.R
   def handle(
     server: PIDE_AI_Server,
     args: JSON.Object.T,
-    progress: Progress,
+    progress: PIDE_AI_Progress,
     context: PIDE_AI_Client_Context
   ): PIDE_AI_Tool_Result =
     PIDE_AI_Tool_Result.result {

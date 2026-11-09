@@ -9,7 +9,7 @@ import isabelle._
 class PIDE_AI_Server(
   options: Options,
   val log: Logger,
-  val base_progress: Progress,
+  val base_progress: PIDE_AI_Progress,
   val service_table: Map[String, PIDE_AI_Service],
   val tool_table: Map[String, PIDE_AI_Tool],
   val client_info_table: Map[String, PIDE_AI_Client_Info],

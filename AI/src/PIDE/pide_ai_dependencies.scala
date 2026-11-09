@@ -35,7 +35,7 @@ object PIDE_AI_Dependencies {
   def disk_dependencies(
     session: PIDE_AI_Headless.Session,
     names: List[Document.Node.Name],
-    progress: Progress
+    progress: PIDE_AI_Progress
   ): List[Document.Node.Name] = {
     val deps = session.resources.dependencies(session.conditions,
       names.filter(_.is_theory).map((_, Position.none)), progress = progress)
@@ -48,7 +48,7 @@ object PIDE_AI_Dependencies {
     nodes: Document.Nodes,
     node_names: List[Document.Node.Name],
     exclude: Set[Document.Node.Name],
-    progress: Progress
+    progress: PIDE_AI_Progress
   ): List[Document.Node.Name] = {
     val resources = session.resources
     def is_unloaded(name: Document.Node.Name): Boolean =

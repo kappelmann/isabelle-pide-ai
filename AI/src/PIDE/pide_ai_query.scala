@@ -37,7 +37,7 @@ class PIDE_AI_Query(
   session: PIDE_AI_Session,
   context: PIDE_AI_Editor.Context,
   operation: String,
-  progress: Progress,
+  progress: PIDE_AI_Progress,
   cwd: Option[Path]
 ) {
   private val editor = session.editor(progress)

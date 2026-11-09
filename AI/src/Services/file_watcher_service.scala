@@ -14,7 +14,7 @@ class File_Watcher_Service extends PIDE_AI_Service("file_watcher") {
   def description: String = "Synchronise disk changes of loaded files."
 
   private val watchers = Synchronized(
-    Map.empty[String, (PIDE_AI_File_Watcher[Document.Node.Name], Progress)])
+    Map.empty[String, (PIDE_AI_File_Watcher[Document.Node.Name], PIDE_AI_Progress)])
 
   private def loaded_files(session: PIDE_AI_Session): () => List[Document.Node.Name] = {
     var cache = (Document.Version.init, List.empty[Document.Node.Name])
