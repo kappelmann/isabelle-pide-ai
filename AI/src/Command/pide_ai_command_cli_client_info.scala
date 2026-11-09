@@ -10,10 +10,8 @@ import isabelle._
 val PIDE_AI_Command_CLI_Client_Info = new PIDE_AI_Client_Info("pide_ai_cli",
   PIDE_AI_Command_Protocol, {
     case tcp: PIDE_AI_TCP_Connector => Some(
-      s"CLI: `CLIENT ${tcp.port} TOOL 'JSON'` (clients in " +
-      quote(File.platform_path(Path.explode("$PIDE_AI_HOME/clients"))) +
-      s"), e.g. `CLIENT ${tcp.port} ${List_Extensions_Tool.id} '" +
-      s"${JSON.Format(List_Extensions_Tool.show_input_schema_arg(true))}'`.")
+      s"CLI on port ${tcp.port}: `CLIENT -?` shows usage (clients in " +
+      quote(File.platform_path(Path.explode("$PIDE_AI_HOME/clients"))) + ").")
     case _ => None
   })
 

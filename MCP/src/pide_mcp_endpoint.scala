@@ -37,12 +37,14 @@ class PIDE_MCP_Endpoint(
 
   private val events = Mailbox[Event]()
 
-  private var tool_calls = Map.empty[JSON_RPC.Id, (MCP.Tool_Call, PIDE_AI_Tool_Call)]
+  private var tool_calls = Map.empty[JSON_RPC.Id, PIDE_AI_Tool_Call]
   private var cancelled = Set.empty[JSON_RPC.Id]
   private var stopping = false
 
   private def progress_token_owner(token: MCP.Progress_Token): Option[JSON_RPC.Id] =
-    tool_calls.collectFirst { case (id, (call, _)) if call.progress_token.contains(token) => id }
+    tool_calls.collectFirst {
+      case (id, call) if call.tool_call.progress_token.contains(token) => id
+    }
 
   private def read_input(): Unit = {
     PIDE_AI_Util.log_failure(log, "MCP input failure",
@@ -53,12 +55,12 @@ class PIDE_MCP_Endpoint(
   private def handle_cancelled(params: JSON.Object.T): Unit =
     Exn.result { MCP.read_cancellation(params) } match {
       case Exn.Res(cancellation) =>
-        for ((_, task) <- tool_calls.get(cancellation.id) if !cancelled(cancellation.id)) {
+        for (call <- tool_calls.get(cancellation.id) if !cancelled(cancellation.id)) {
           log("Cancelling tool call " + JSON.Format(cancellation.id) +
             cancellation.reason.map(reason =>
               s" (reason: ${JSON.Format(reason)})").getOrElse("") + "...")
           cancelled += cancellation.id
-          task.stop()
+          call.stop()
         }
       case Exn.Exn(exn) =>
         log.error_message("Malformed cancellation notification: " + Exn.message(exn))
@@ -80,24 +82,19 @@ class PIDE_MCP_Endpoint(
     respond(JSON_RPC.result(id, JSON_Object("tools" -> server.tools.map(_.json))))
 
   private def handle_tool_call(id: JSON_RPC.Id, params: JSON.Object.T): Unit =
-    Exn.result { MCP.read_tool_call(params) } match {
+    Exn.result {
+      val tool_call = MCP.read_tool_call(params)
+      for (token <- tool_call.progress_token; owner <- progress_token_owner(token))
+        error(s"Progress token ${JSON.Format(token)} is already used " +
+          s"for request ${JSON.Format(owner)}")
+      val tool = server.tool(tool_call.name).getOrElse(error(tool_not_found(tool_call.name)))
+      (tool, tool_call)
+    } match {
       case Exn.Exn(exn) => respond_error(id, JSON_RPC.Error_Code.INVALID_PARAMS, Exn.message(exn))
-      case Exn.Res(call) => call.progress_token.flatMap(token =>
-        progress_token_owner(token).map(token -> _)) match {
-          case Some((token, owner)) => respond_error(id, JSON_RPC.Error_Code.INVALID_PARAMS,
-            s"Progress token ${JSON.Format(token)} is already used " +
-            s"for request ${JSON.Format(owner)}")
-          case None => server.tool(call.name) match {
-            case None => respond_error(id, JSON_RPC.Error_Code.INVALID_PARAMS,
-              tool_not_found(call.name))
-            case Some(tool) =>
-              val task = start_tool_call(tool, call.args,
-                call.progress_token.map(token => (serial, message) =>
-                  events.send(Event.Tool_Progress(id, token, serial, message))),
-                result => events.send(Event.Tool_Result(id, result)))
-              tool_calls += id -> (call, task)
-          }
-        }
+      case Exn.Res((tool, tool_call)) =>
+        tool_calls += id -> start_tool_call(tool, tool_call,
+          (token, serial, message) => events.send(Event.Tool_Progress(id, token, serial, message)),
+          result => events.send(Event.Tool_Result(id, result)))
     }
 
   private def handle_message(json: JSON.T): Unit =

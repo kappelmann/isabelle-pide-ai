@@ -1,13 +1,12 @@
-/*  Title:      MCP/src/json_rpc.scala
+/*  Title:      AI/src/MCP/json_rpc.scala
     Author:     Kevin Kappelmann
 
 JSON-RPC 2.0 messages.
 */
 
-package isabelle.pide.mcp
+package isabelle.pide.ai
 
 import isabelle._
-import isabelle.pide.ai._
 
 object JSON_RPC {
   val version = "2.0"

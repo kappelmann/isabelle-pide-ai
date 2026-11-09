@@ -54,6 +54,8 @@ sources = \
   src/Server/pide_ai_startup_sessions.scala \
   src/Server/pide_ai_tool_call.scala \
   src/Server/pide_ai_tool_endpoint.scala \
+  src/MCP/json_rpc.scala \
+  src/MCP/mcp.scala \
   src/Command/pide_ai_command.scala \
   src/Command/pide_ai_command_cli_client_info.scala \
   src/Command/pide_ai_command_client.scala \

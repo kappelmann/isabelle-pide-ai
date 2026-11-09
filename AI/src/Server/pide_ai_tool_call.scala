@@ -8,8 +8,8 @@ import isabelle._
 
 class PIDE_AI_Tool_Call(
   server: PIDE_AI_Server,
-  tool: PIDE_AI_Tool,
-  args: JSON.Object.T,
+  val tool: PIDE_AI_Tool,
+  val tool_call: MCP.Tool_Call,
   progress: Progress,
   log: Logger,
   context: PIDE_AI_Client_Context
@@ -17,9 +17,9 @@ class PIDE_AI_Tool_Call(
   def run(): PIDE_AI_Tool_Result =
     Exn.capture {
       progress.expose_interrupt()
-      PIDE_AI_Tool_Result.result(tool.check_args(args)) match {
+      PIDE_AI_Tool_Result.result(tool.check_args(tool_call.args)) match {
         case Result.Error(error) => Result.Error(error)
-        case Result.Res(_) => tool.handle(server, args, progress, context)
+        case Result.Res(_) => tool.handle(server, tool_call.args, progress, context)
       }
     } match {
       case Exn.Res(result) => result

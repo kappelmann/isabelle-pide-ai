@@ -8,20 +8,40 @@ PRG="$(basename "$0")"
 
 function usage()
 {
-  echo "Usage: $PRG PORT TOOL [JSON]" >&2
+  echo >&2
+  echo "Usage: $PRG PORT [OPTIONS] TOOL [JSON]" >&2
+  echo >&2
+  echo "  Options are:" >&2
+  echo "    -p           report progress" >&2
+  echo >&2
+  echo "  list_extensions '{\"show_input_schema\":true}' lists tools with their arguments." >&2
+  echo >&2
   exit 2
 }
 
-[ "$#" -ge 2 -a "$#" -le 3 ] || usage
-
+[ "$#" -ge 1 -a "$1" != "-?" ] || usage
 PORT="$1"
-TOOL="$2"
-JSON="${3:-"{}"}"
+shift
+
+META=""
+while getopts "p" OPT
+do
+  case "$OPT" in
+    p) META=',"_meta":{"progressToken":1}' ;;
+    *) usage ;;
+  esac
+done
+shift $((OPTIND - 1))
+
+[ "$#" -ge 1 -a "$#" -le 2 ] || usage
+
+TOOL="$1"
+JSON="${2:-"{}"}"
 JSON="${JSON//$'\r'/}"
 JSON="${JSON//$'\n'/ }"
 
 exec 3<>"/dev/tcp/127.0.0.1/$PORT" || exit 2
-printf 'cmd %s\n%s %s\n' "$PWD" "$TOOL" "$JSON" >&3
+printf 'cmd %s\n{"name":"%s","arguments":%s%s}\n' "$PWD" "$TOOL" "$JSON" "$META" >&3
 IFS= read -r FIRST <&3
 if [ "$FIRST" != OK ]; then
   [ -z "$FIRST" ] || printf '%s\n' "$FIRST"

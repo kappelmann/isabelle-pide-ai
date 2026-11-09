@@ -6,8 +6,6 @@ requirements = \
   env:ISABELLE_PIDE_AI_JAR
 sources = \
   src/pide_mcp.scala \
-  src/json_rpc.scala \
-  src/mcp.scala \
   src/pide_mcp_protocol.scala \
   src/pide_mcp_endpoint.scala \
   src/pide_mcp_proxy_client_info.scala

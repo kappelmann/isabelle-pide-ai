@@ -1,13 +1,12 @@
-/*  Title:      MCP/src/mcp.scala
+/*  Title:      AI/src/MCP/mcp.scala
     Author:     Kevin Kappelmann
 
 Model Context Protocol.
 */
 
-package isabelle.pide.mcp
+package isabelle.pide.ai
 
 import isabelle._
-import isabelle.pide.ai._
 
 object MCP {
   val protocol_version = "2025-11-25"
@@ -73,7 +72,10 @@ object MCP {
     name: String,
     args: JSON.Object.T,
     progress_token: Option[Progress_Token]
-  )
+  ) {
+    def json: JSON.Object.T =
+      name_arg(name) ++ arguments_arg(args) ++ meta_arg(progress_token_arg(progress_token))
+  }
 
   private def read_progress_token(params: JSON.Object.T): Option[Progress_Token] =
     meta_arg.within(params)(progress_token_arg.get)

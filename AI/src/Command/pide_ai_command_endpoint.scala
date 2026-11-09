@@ -28,12 +28,12 @@ class PIDE_AI_Command_Endpoint(
     try { for (line <- connection.read_line()) error(s"Unexpected input after command: $line") }
     catch { case _: IOException => }
 
-  private def handle_tool_call(tool: PIDE_AI_Tool, args: JSON.Object.T): Unit = {
-    val call = start_tool_call(tool, args,
-      Some((_, message) =>
+  private def handle_tool_call(tool: PIDE_AI_Tool, tool_call: MCP.Tool_Call): Unit = {
+    val call = start_tool_call(tool, tool_call,
+      (_, _, message) =>
         if (!connection.closed.value) Exn.result {
           respond(PIDE_AI_Command.progress_response(message))
-        }),
+        },
       { result =>
         PIDE_AI_Util.release_combined(List(
           Exn.capture {
@@ -48,13 +48,14 @@ class PIDE_AI_Command_Endpoint(
   }
 
   private def handle_request(line: String): Unit =
-    Exn.result { PIDE_AI_Command.parse_request(line) } match {
+    Exn.result {
+      val tool_call = PIDE_AI_Command.parse_tool_call(line)
+      val tool = PIDE_AI_Command_Endpoint.core_tools.find(_.id == tool_call.name)
+        .orElse(server.tool(tool_call.name)).getOrElse(error(tool_not_found(tool_call.name)))
+      (tool, tool_call)
+    } match {
       case Exn.Exn(exn) => respond_error(Exn.message(exn))
-      case Exn.Res((id, args)) =>
-        PIDE_AI_Command_Endpoint.core_tools.find(_.id == id).orElse(server.tool(id)) match {
-          case None => respond_error(tool_not_found(id))
-          case Some(tool) => handle_tool_call(tool, args)
-        }
+      case Exn.Res((tool, tool_call)) => handle_tool_call(tool, tool_call)
     }
 
   private val request_scope = new Task_Scope[Task[?]]

@@ -20,17 +20,17 @@ abstract class PIDE_AI_Tool_Endpoint(
 
   def start_tool_call(
     tool: PIDE_AI_Tool,
-    args: JSON.Object.T,
-    report_progress: Option[(Long, String) => Unit],
+    tool_call: MCP.Tool_Call,
+    report_progress: (MCP.Progress_Token, Long, String) => Unit,
     report_result: PIDE_AI_Tool_Result => Unit
   ): PIDE_AI_Tool_Call = {
     val serial = Counter.make()
     val progress = new Reporting_Progress(
       new Sub_Progress(server.base_progress) with Progress.Local_Interrupts,
       report_output = messages =>
-        for (report <- report_progress; message <- messages)
-          report(serial(), message.message.output_text))
-    val call = new PIDE_AI_Tool_Call(server, tool, args, progress, log, context)
+        for (token <- tool_call.progress_token; message <- messages)
+          report_progress(token, serial(), message.message.output_text))
+    val call = new PIDE_AI_Tool_Call(server, tool, tool_call, progress, log, context)
     tool_call_scope.fork("pide_ai_tool_call", call, on_finish = { result =>
       progress.stop_reporting()
       for (tool_result <- Exn.the_res.lift(result)) {

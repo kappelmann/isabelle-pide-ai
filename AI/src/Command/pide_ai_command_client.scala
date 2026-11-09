@@ -31,7 +31,7 @@ object PIDE_AI_Command_Client {
     args: JSON.Object.T,
     progress: Progress
   ): PIDE_AI_Tool_Result = {
-    connection.write_line(PIDE_AI_Command.request_line(tool_id, args))
+    connection.write_line(JSON.Format(MCP.Tool_Call(tool_id, args, Some(1L)).json))
     read_response(connection, tool_id, progress)
   }
 }
