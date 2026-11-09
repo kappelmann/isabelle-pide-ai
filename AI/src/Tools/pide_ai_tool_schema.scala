@@ -31,4 +31,10 @@ object PIDE_AI_Tool_Schema {
     "start_line", "", JSON_Schema.Format.int(minimum = Some(1)), 1)
   val opt_end_line_arg = JSON_Schema.Arg.optional(
     "end_line", "Default: end of file.", JSON_Schema.Format.int(minimum = Some(1)))
+
+  val seconds_format: JSON_Schema.Format[Time] =
+    JSON_Schema.Format.real(minimum = Some(0)).map(Time.seconds(_), _.seconds)
+  val long_running_arg = JSON_Schema.Arg.optional("long_running",
+    s"Threshold in seconds. Default: ${PIDE_AI_Session.long_running_threshold_option}.",
+    seconds_format)
 }

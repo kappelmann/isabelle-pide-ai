@@ -12,22 +12,24 @@ object PIDE_AI_Query {
     outcome: Outcome,
     elapsed: Time,
     output: Editor.Output,
-    command: Option[Command],
-    unicode_symbols: Boolean
+    command: Option[Command]
   ) {
-    def messages: List[PIDE_AI_Message.Message] = {
+    def messages: List[PIDE_AI_Message] = {
       val ranges = command.flatMap(cmd =>
         output.snapshot.command_start(cmd).map(cmd.range + _)).toList
       output.messages.flatMap(elem =>
-        PIDE_AI_Message.Message_Kind.of(elem).map(kind =>
-          PIDE_AI_Message.Message(kind, elem, ranges, output.snapshot, command,
-            unicode_symbols)))
+        PIDE_AI_Message.Kind.of(elem).map(kind =>
+          PIDE_AI_Message(kind, elem, ranges, output.snapshot, command)))
     }
 
-    def json(kinds: List[PIDE_AI_Message.Message_Kind], cwd: Option[Path]): JSON.Object.T =
+    def json(
+      kinds: List[PIDE_AI_Message.Kind],
+      unicode_symbols: Boolean,
+      cwd: Option[Path]
+    ): JSON.Object.T =
       JSON_Object.flatten(
         List(Some("status" -> outcome.toString), Some("elapsed_ms" -> elapsed.ms)) :::
-        PIDE_AI_Message.messages_json(messages.groupBy(_.kind), kinds, cwd))
+        PIDE_AI_Message.Messages.json(messages.groupBy(_.kind), kinds, unicode_symbols, cwd))
   }
 }
 
@@ -78,7 +80,10 @@ class PIDE_AI_Query(
     query.activate()
     try {
       editor.send_wait_dispatcher { query.apply_query(args) }
-      val outcome = session.await_while_ready(progress, operation) {
+      val outcome = session.await_while_ready(progress,
+        elapsed => "Awaiting " + operation + " " + PIDE_AI_Progress.elapsed_text(elapsed),
+        PIDE_AI_Session.poll_delay(session.options),
+        PIDE_AI_Session.progress_delay(session.options)) {
         if (finished) Some(PIDE_AI_Query.Outcome.finished)
         else if (stop(output.value)) Some(PIDE_AI_Query.Outcome.stopped)
         else {
@@ -86,8 +91,7 @@ class PIDE_AI_Query(
           Option.when(timeout.exists(Time.now() - start > _))(PIDE_AI_Query.Outcome.timeout)
         }
       }
-      PIDE_AI_Query.Result(outcome, Time.now() - start, output.value, query.get_location,
-        session.unicode_symbols)
+      PIDE_AI_Query.Result(outcome, Time.now() - start, output.value, query.get_location)
     }
     finally {
       if (!finished) Exn.capture { editor.send_wait_dispatcher { query.cancel_query() } }

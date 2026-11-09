@@ -44,6 +44,17 @@ object JSON_Schema {
         unapply, identity[Int])
     }
 
+    def real(
+      minimum: Option[Double] = None,
+      maximum: Option[Double] = None
+    ): Format[Double] = {
+      val unapply = (json: JSON.T) => JSON.Value.Double.unapply(json).filter(value =>
+        minimum.forall(_ <= value) && maximum.forall(value <= _))
+      Format(JSON_Object("type" -> "number") ++
+          JSON.optional("minimum" -> minimum) ++ JSON.optional("maximum" -> maximum),
+        unapply, identity[Double])
+    }
+
     val long: Format[Long] = Format(JSON_Object("type" -> "integer"),
       JSON.Value.Long.unapply, identity[Long])
 

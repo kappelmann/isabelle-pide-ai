@@ -24,6 +24,7 @@ sources = \
   src/TCP/socket_connection.scala \
   src/Stdio/pide_ai_stdio_connector.scala \
   src/Stdio/stdio_connection.scala \
+  src/PIDE/pide_ai_command_status.scala \
   src/PIDE/pide_ai_definition.scala \
   src/PIDE/pide_ai_dependencies.scala \
   src/PIDE/pide_ai_document_command.scala \

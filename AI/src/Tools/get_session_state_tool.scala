@@ -22,7 +22,7 @@ with PIDE_AI_Tool.Read_Only {
     JSON_Schema.Format.dictionary(
       JSON_Schema.Format.list(JSON_Schema.Format.string)),
     VectorMap.empty)
-  val show_cmds_processing_arg = JSON_Schema.Arg.default(
+  val show_cmds_running_arg = JSON_Schema.Arg.default(
     "show_cmds_processing", "", JSON_Schema.Format.bool, true)
   val show_dynamic_thys_arg = JSON_Schema.Arg.default(
     "show_dynamic_thys", s"${quote("summary")}: status, progress, command counts.",
@@ -46,7 +46,8 @@ with PIDE_AI_Tool.Read_Only {
 
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(
     List(PIDE_AI_Tool_Schema.running_sessions_arg, filter_origins_arg,
-      show_cmds_processing_arg, show_dynamic_thys_arg, show_base_session_thys_arg,
+      show_cmds_running_arg, PIDE_AI_Tool_Schema.long_running_arg,
+      show_dynamic_thys_arg, show_base_session_thys_arg,
       show_session_dirs_arg, show_options_arg, show_statistics_arg))
 
   def handle(
@@ -65,14 +66,16 @@ with PIDE_AI_Tool.Read_Only {
           s"selection ${commas_quote(selected_ids)}.")
       }
       val show = PIDE_AI_Session_State.Show(
-        cmds_processing = show_cmds_processing_arg.get(args),
+        cmds_running = show_cmds_running_arg.get(args),
         dynamic_thys = show_dynamic_thys_arg.get(args),
         base_session_thys = show_base_session_thys_arg.get(args),
         session_dirs = show_session_dirs_arg.get(args),
         options = show_options_arg.get(args),
         statistics = show_statistics_arg.get(args))
+      val long_running_threshold = PIDE_AI_Tool_Schema.long_running_arg.get(args)
       JSON_Object("sessions" -> selected_sessions.map(session =>
         PIDE_AI_Session_State.json(session, filter_origins.get(session.id), show,
+          long_running_threshold.getOrElse(PIDE_AI_Session.long_running_threshold(session.options)),
           context.cwd))) ++
       JSON_Object.if_proper(show.statistics,
         PIDE_AI_Session_State.jvm_stats_json())

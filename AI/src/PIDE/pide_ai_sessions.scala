@@ -126,7 +126,9 @@ class PIDE_AI_Sessions(
           s"with base session ${quote(spec.logic)}...")
         start_progress.expose_interrupt()
         val (session_options, session_background) = build_lock.with_lock(start_progress,
-          s"Awaiting build queue for session ${quote(id)}", PIDE_AI_Sessions.build_delay(options),
+          elapsed => s"Awaiting build queue for session ${quote(id)} " +
+            PIDE_AI_Progress.elapsed_text(elapsed),
+          PIDE_AI_Sessions.build_delay(options),
           PIDE_AI_Session.progress_delay(options)) {
           PIDE_AI_Session.build(base_options, spec, start_progress)
         }

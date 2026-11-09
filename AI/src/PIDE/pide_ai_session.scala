@@ -11,7 +11,7 @@ import scala.annotation.tailrec
 import scala.collection.immutable.Queue
 
 object PIDE_AI_Session {
-  def progress_delay(options: Options): Time = options.seconds("pide_ai_session_progress_delay")
+  def progress_delay(options: Options): Time = options.seconds("pide_ai_progress_delay")
   def poll_delay(options: Options): Time = options.seconds("pide_ai_poll_delay")
   def range_context(options: Options): Int = options.int("pide_ai_range_context")
   def statistics_limit(options: Options): Int = options.int("pide_ai_session_statistics_limit")
@@ -20,6 +20,9 @@ object PIDE_AI_Session {
     options.bool("pide_ai_unicode_symbols_disk")
   def build_long_running_threshold(options: Options): Time =
     options.seconds("pide_ai_build_long_running_threshold")
+  val long_running_threshold_option: String = "pide_ai_long_running_threshold"
+  def long_running_threshold(options: Options): Time =
+    options.seconds(long_running_threshold_option)
   def build_report_nodes_status_delay(options: Options): Time =
     options.seconds("pide_ai_build_report_nodes_status_delay")
 
@@ -108,13 +111,11 @@ class PIDE_AI_Session private(
   def base_session: String = resources.current_background.session_name
   def directories(): List[Path] = Sessions.directories(dirs, Nil).map(_._2)
 
-  private def await_message(what: String): String =
-    s"Awaiting $what for session ${quote(id)}"
-
   private val lock = new Queue_Lock
   def with_lock[A](progress: Progress)(body: => A): A =
-    lock.with_lock(progress, await_message("session lock"), PIDE_AI_Session.poll_delay(options),
-      PIDE_AI_Session.progress_delay(options))(body)
+    lock.with_lock(progress,
+      elapsed => "Awaiting session lock " + PIDE_AI_Progress.elapsed_text(elapsed),
+      PIDE_AI_Session.poll_delay(options), PIDE_AI_Session.progress_delay(options))(body)
 
   private val statistics = Synchronized[Queue[Properties.T]](Queue.empty)
   private val statistics_consumer = Session.Consumer[Session.Runtime_Statistics](this.class_name) {
@@ -169,11 +170,11 @@ class PIDE_AI_Session private(
 
   def await_while_ready[A](
     progress: Progress,
-    what: => String,
-    delay: => Time = PIDE_AI_Session.poll_delay(options)
+    message: Time => String,
+    delay: => Time,
+    progress_delay: Time
   )(value: => Option[A]): A =
-    PIDE_AI_Progress.await_delay(progress, await_message(what), delay,
-      PIDE_AI_Session.progress_delay(options)) {
+    PIDE_AI_Progress.await_delay(progress, message, delay, progress_delay) {
       require_ready()
       value
     }
@@ -181,7 +182,9 @@ class PIDE_AI_Session private(
   def tip_change: Document.Change = session.get_state().history.tip
 
   def await_stable(change: Document.Change, progress: Progress): Unit =
-    await_while_ready(progress, "stable snapshot") {
+    await_while_ready(progress,
+      elapsed => "Awaiting stable snapshot " + PIDE_AI_Progress.elapsed_text(elapsed),
+      PIDE_AI_Session.poll_delay(options), PIDE_AI_Session.progress_delay(options)) {
       val state = session.get_state()
       val unstable = state.history.undo_list.iterator.takeWhile(!state.is_stable(_))
       Option.when(!unstable.contains(change))(())
@@ -208,7 +211,10 @@ class PIDE_AI_Session private(
   def tip_version(progress: Progress): Document.Version = {
     progress.expose_interrupt()
     val version = session.get_state().history.tip.version
-    await_while_ready(progress, "current document version")(version.peek.map(Exn.release))
+    await_while_ready(progress,
+      elapsed => "Awaiting current document version " + PIDE_AI_Progress.elapsed_text(elapsed),
+      PIDE_AI_Session.poll_delay(options), PIDE_AI_Session.progress_delay(options))(
+        version.peek.map(Exn.release))
   }
 
   def read_file_content(node_name: Document.Node.Name): String =

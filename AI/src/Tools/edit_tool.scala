@@ -47,15 +47,15 @@ object Edit_Tool {
       val actual_old_text = if (old_text.isEmpty) range_text else old_text
       val offsets = if (old_text.isEmpty) List(search_range.start)
         else {
-          val occurrences = new Regex(Regex.quote(actual_old_text))
+          val matches = new Regex(Regex.quote(actual_old_text))
             .findAllMatchIn(range_text).map(_.start + search_range.start).toList
-          if (occurrences.isEmpty)
+          if (matches.isEmpty)
             error("old_text not found in given range. The file may have changed.")
-          if (!request.edit_all && occurrences.length > 1)
-            error(s"Found ${occurrences.length} occurrences of old_text in given range. " +
+          if (!request.edit_all && matches.length > 1)
+            error(s"Found ${matches.length} matches of old_text in given range. " +
               "Expected exactly 1. " +
               "Provide more context (larger old_text), restrict the range, or use edit_all.")
-          if (request.edit_all) occurrences else List(occurrences.head)
+          if (request.edit_all) matches else List(matches.head)
         }
       val replaced_ranges = offsets.map(replaced_range(request.mode, _, actual_old_text.length))
       val computed_text = replaced_ranges.reverseIterator.foldLeft(current_text) { (text, range) =>

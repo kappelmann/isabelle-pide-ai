@@ -84,7 +84,7 @@ class Sledgehammer_Tool extends PIDE_AI_Tool("sledgehammer") with PIDE_AI_Tool.R
       new PIDE_AI_Query(session, editor_context, "sledgehammer", progress, cwd)
         .run(query_args, timeout_arg.get(args),
           stop = output => proofs_count(output) >= proofs_limit)
-        .json(PIDE_AI_Message.Message_Kind.values.toList, cwd)
+        .json(PIDE_AI_Message.Kind.values.toList, session.unicode_symbols, cwd)
     }
 }
 

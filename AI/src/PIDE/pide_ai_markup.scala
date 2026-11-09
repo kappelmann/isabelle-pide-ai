@@ -21,15 +21,8 @@ object PIDE_AI_Markup {
     snapshot.cumulate(range, List.empty[Text.Info[XML.Elem]], elements,
       _ => { (acc, info) => Some(info :: acc) })
 
-  def bad(
-    snapshot: Document.Snapshot,
-    range: Text.Range,
-    unicode_symbols: Boolean
-  ): List[Text.Info[String]] =
-    snapshot.select(range, Markup.Elements(Markup.BAD), _ => {
-      case Text.Info(r, elem) =>
-        Some(Text.Info(r, PIDE_AI_Util.elem_body_plain_text(elem, unicode_symbols)))
-    }).map(_.info)
+  def bad(snapshot: Document.Snapshot, range: Text.Range): List[Text.Info[XML.Elem]] =
+    snapshot.select(range, Markup.Elements(Markup.BAD), _ => Some(_)).map(_.info)
 
   def facts_json(
     snapshot: Document.Snapshot,

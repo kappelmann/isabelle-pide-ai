@@ -8,6 +8,10 @@ package isabelle.pide.ai
 
 import isabelle._
 
+object Queue_Lock {
+  def ahead_text(ahead: Int): String = s"($ahead ahead in queue)"
+}
+
 class Queue_Lock {
   private val queue = Synchronized[List[Thread]](Nil)
 
@@ -15,7 +19,7 @@ class Queue_Lock {
 
   def with_lock[A](
     progress: Progress,
-    message: => String,
+    message: Time => String,
     delay: Time,
     progress_delay: Time
   )(body: => A): A = {
@@ -26,9 +30,9 @@ class Queue_Lock {
     else {
       queue.change(_ ::: List(thread))
       try {
-        PIDE_AI_Progress.await_guarded(queue, progress, {
+        PIDE_AI_Progress.await_guarded(queue, progress, { elapsed =>
             val n = ahead(queue.value)
-            message + if_proper(n > 0, s" ($n ahead in queue)")
+            message(elapsed) + if_proper(n > 0, " " + Queue_Lock.ahead_text(n))
           }, delay, progress_delay)(threads => Option.when(holding(threads))(()))
         body
       } finally queue.change(_.filterNot(_ == thread))

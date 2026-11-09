@@ -11,9 +11,11 @@ import isabelle._
 import scala.annotation.tailrec
 
 object PIDE_AI_Progress {
+  def elapsed_text(elapsed: Time): String = s"(${elapsed.message} elapsed)"
+
   def await[A](
     progress: Progress,
-    message: => String,
+    message: Time => String,
     progress_delay: Time
   )(attempt: => Option[A]): A = {
     val start = Time.now()
@@ -26,7 +28,7 @@ object PIDE_AI_Progress {
           val limit1 =
             if (now < limit) limit
             else {
-              progress.echo(message + s" ... (${(now - start).message} elapsed time)")
+              progress.echo(message(now - start))
               now + progress_delay
             }
           poll(limit1)
@@ -37,7 +39,7 @@ object PIDE_AI_Progress {
 
   def await_delay[A](
     progress: Progress,
-    message: => String,
+    message: Time => String,
     delay: => Time,
     progress_delay: Time
   )(value: => Option[A]): A =
@@ -46,7 +48,7 @@ object PIDE_AI_Progress {
   def await_guarded[S, A](
     state: Synchronized[S],
     progress: Progress,
-    message: => String,
+    message: Time => String,
     delay: Time,
     progress_delay: Time
   )(value: S => Option[A]): A =

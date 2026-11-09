@@ -11,6 +11,9 @@ object Get_State_Tool {
     options.seconds("pide_ai_get_state_delay")
   def get_state_check_factor(options: Options): Double =
     options.real("pide_ai_get_state_check_factor")
+  val get_state_progress_delay_option: String = "pide_ai_get_state_progress_delay"
+  def get_state_progress_delay(options: Options): Time =
+    options.seconds(get_state_progress_delay_option)
 
   enum Stop_On {
     case any_failed, all_terminated
@@ -29,16 +32,13 @@ object Get_State_Tool {
       }
   }
 
-  val other_cmds_processing_key: String =
-    "other_" + PIDE_AI_Document_Command.Status.key(PIDE_AI_Document_Command.Status.running.name)
+  val other_cmds_running_key: String =
+    "other_" + PIDE_AI_Document_Command.States.cmds_key(PIDE_AI_Command_Status.running.name)
 
-  enum Show_Other_Cmds_Processing {
-    case never, if_range_unfinished, always
-    def show(range_summary: JSON.Object.T): Boolean =
-      this == always || this == if_range_unfinished &&
-        List(PIDE_AI_Document_Command.Status.unprocessed, PIDE_AI_Document_Command.Status.running)
-          .exists(status =>
-            range_summary.contains(PIDE_AI_Document_Command.Status.key(status.name)))
+  enum Show_Other_Cmds_Running {
+    case never, if_range_unterminated, always
+    def show(unterminated: Boolean): Boolean =
+      this == always || this == if_range_unterminated && unterminated
   }
 
   def base_description(which_commands: String): String =
@@ -55,14 +55,15 @@ object Get_State_Tool {
       "show_summary_warnings", "", JSON_Schema.Format.bool, false)
     val summary_problematic_limit_arg = JSON_Schema.Arg.optional(
       "summary_problematic_limit",
-      "Problematic occurrences to return. Default: all.",
+      "Problematic items to return. Default: all.",
       JSON_Schema.Format.int(minimum = Some(0)))
     val snippet_lines_arg = JSON_Schema.Arg.default(
       "snippet_lines", "Number of source lines shown (0 for line ranges only).",
       JSON_Schema.Format.int(minimum = Some(0)), 1)
     val details_arg = JSON_Schema.Arg.default(
       "details",
-      s"Details to return. infos = ${commas(PIDE_AI_Message.Message_Kind.info.map(_.toString))}.",
+      "Details to return. infos = " + commas(PIDE_AI_Document_Command.State.Detail.kinds(
+        PIDE_AI_Document_Command.State.Detail.infos).map(PIDE_AI_Message.Messages.key)) + ".",
       JSON_Schema.Format.list(
         JSON_Schema.Format.enumeration(PIDE_AI_Document_Command.State.Detail.values)),
       Nil)
@@ -80,42 +81,48 @@ object Get_State_Tool {
     val show_descendant_thys_arg = JSON_Schema.Arg.default(
       "show_descendant_thys", "Summary of descendants.",
       JSON_Schema.Format.enumeration(Show_Thys.values), Show_Thys.none)
-    val show_other_cmds_processing_arg = JSON_Schema.Arg.default(
-      "show_" + other_cmds_processing_key, "",
-      JSON_Schema.Format.enumeration(Show_Other_Cmds_Processing.values),
-      Show_Other_Cmds_Processing.if_range_unfinished)
+    val show_other_cmds_running_arg = JSON_Schema.Arg.default(
+      "show_" + other_cmds_running_key, "",
+      JSON_Schema.Format.enumeration(Show_Other_Cmds_Running.values),
+      Show_Other_Cmds_Running.if_range_unterminated)
 
     def timeout_arg(default: Int) = JSON_Schema.Arg.default(
       "timeout", "Seconds to wait.",
       JSON_Schema.Format.int(minimum = Some(0)).map(Time.seconds(_), _.seconds.toInt),
       Time.seconds(default))
+    val progress_delay_arg = JSON_Schema.Arg.optional("progress_delay",
+      s"Seconds between reports. Default: $get_state_progress_delay_option.",
+      PIDE_AI_Tool_Schema.seconds_format)
 
     def args(timeout_arg: JSON_Schema.Arg[Time]): List[JSON_Schema.Arg[?]] =
       List(show_summary_warnings_arg, summary_problematic_limit_arg, snippet_lines_arg,
         details_arg, details_problematic_limit_arg, details_unproblematic_limit_arg,
-        show_ancestor_thys_arg, show_descendant_thys_arg, show_other_cmds_processing_arg,
-        timeout_arg, stop_on_arg)
+        show_ancestor_thys_arg, show_descendant_thys_arg, show_other_cmds_running_arg,
+        PIDE_AI_Tool_Schema.long_running_arg, timeout_arg, stop_on_arg,
+        progress_delay_arg)
 
     def from_json(args: JSON.Object.T, timeout_arg: JSON_Schema.Arg[Time]): Request = {
-      val summary_message_kinds = PIDE_AI_Message.Message_Kind.errors ::
-        Option.when(show_summary_warnings_arg.get(args))(
-          PIDE_AI_Message.Message_Kind.warnings).toList
+      val message_kinds = PIDE_AI_Message.Kind.error ::
+        Option.when(show_summary_warnings_arg.get(args))(PIDE_AI_Message.Kind.warning).toList
       Request(timeout_arg.get(args), stop_on_arg.get(args),
-        PIDE_AI_Document_Command.States.Report(details_arg.get(args).toSet, summary_message_kinds,
+        PIDE_AI_Document_Command.States.Show(details_arg.get(args).toSet, message_kinds,
           details_problematic_limit_arg.get(args), details_unproblematic_limit_arg.get(args),
           summary_problematic_limit_arg.get(args), snippet_lines_arg.get(args)),
         show_ancestor_thys_arg.get(args), show_descendant_thys_arg.get(args),
-        show_other_cmds_processing_arg.get(args))
+        show_other_cmds_running_arg.get(args),
+        PIDE_AI_Tool_Schema.long_running_arg.get(args), progress_delay_arg.get(args))
     }
   }
 
   sealed case class Request(
     timeout: Time,
     stop_on: Stop_On,
-    report: PIDE_AI_Document_Command.States.Report,
+    show: PIDE_AI_Document_Command.States.Show,
     show_ancestor_thys: Show_Thys,
     show_descendant_thys: Show_Thys,
-    show_other_cmds_processing: Show_Other_Cmds_Processing)
+    show_other_cmds_running: Show_Other_Cmds_Running,
+    long_running_threshold: Option[Time],
+    progress_delay: Option[Time])
 
   def state(
     session: PIDE_AI_Session,
@@ -132,43 +139,61 @@ object Get_State_Tool {
     val range = PIDE_AI_Util.check_text_range(
       Line.Document(snapshot0.node.source), start_line, opt_end_line)
     val selection = PIDE_AI_Document_Command.Selection(snapshot0, Some(range))
-    val (snapshot, states, edited, timed_out) =
-      if (request.timeout.is_zero) (snapshot0,
-        PIDE_AI_Document_Command.States(snapshot0, selection, session.unicode_symbols), 0, false)
-      else
+    val resources = session.resources
+    val long_running_threshold = request.long_running_threshold.getOrElse(
+      PIDE_AI_Session.long_running_threshold(session.options))
+
+    def json(
+      snapshot: Document.Snapshot,
+      states: List[PIDE_AI_Document_Command.State],
+      edited: Int,
+      timed_out: Boolean
+    ): JSON.Object.T = {
+      val nodes = snapshot.version.nodes
+      val states_json = PIDE_AI_Document_Command.States.json(states, request.show,
+        Line.Document(snapshot.node.source), long_running_threshold, session.unicode_symbols, cwd)
+      val unterminated = states.exists(!_.command_status.is_terminated)
+      lazy val dynamic_thys = PIDE_AI_Nodes.Loaded(resources, nodes).dynamic
+      val thys = PIDE_AI_Nodes.node_theory(nodes, node_name).toList
+      def statuses(names: Set[Document.Node.Name]): List[PIDE_AI_Theory.Status] =
+        PIDE_AI_Theory.Statuses(snapshot, dynamic_thys.filter(names -- thys))
+      val ancestors = request.show_ancestor_thys.select(
+        statuses(PIDE_AI_Dependencies.known_dependencies(resources, nodes, thys).toSet))
+      val descendants =
+        request.show_descendant_thys.select(statuses(nodes.descendants(thys).toSet))
+      val other_cmds_running =
+        if (!request.show_other_cmds_running.show(unterminated)) JSON.Object.empty
+        else {
+          val cmds = selection.parts.map(_._1).toSet
+          val selections =
+            PIDE_AI_Document_Command.Selection.nodes(session, snapshot, dynamic_thys)
+              .map((node_snapshot, node_selection) =>
+                node_snapshot -> node_selection.filter((cmd, _) => !cmds(cmd)))
+          PIDE_AI_Document_Command.nodes_running_json(resources, selections,
+            1, long_running_threshold, cwd)
+        }
+      states_json ++ JSON_Object.flatten(Option.when(edited > 0)(
+        PIDE_AI_Document_Command.States.cmds_key("edited_omitted") -> edited),
+        Option.when(timed_out)("timed_out" -> true),
+        Option.when(ancestors.nonEmpty)(
+          "ancestors" -> PIDE_AI_Theory.Statuses.json(resources, ancestors, cwd)),
+        Option.when(descendants.nonEmpty)(
+          "descendants" -> PIDE_AI_Theory.Statuses.json(resources, descendants, cwd)),
+        Option.when(other_cmds_running.nonEmpty)(
+          other_cmds_running_key -> other_cmds_running))
+    }
+
+    if (request.timeout.is_zero)
+      json(snapshot0, PIDE_AI_Document_Command.States(snapshot0, selection).toList, 0, false)
+    else {
+      val (snapshot, states, edited, timed_out) =
         PIDE_AI_Document_Command.await_states(session, snapshot0, selection,
           request.stop_on.stop, Some((request.timeout - (Time.now() - start)) max Time.zero),
-          get_state_delay(session.options), get_state_check_factor(session.options), progress)
-    val resources = session.resources
-    val nodes = snapshot.version.nodes
-    val summary = PIDE_AI_Document_Command.States.json(snapshot, states, request.report, cwd)
-    lazy val dynamic_thys = PIDE_AI_Nodes.Loaded(resources, nodes).dynamic
-    val thys = PIDE_AI_Nodes.node_theory(nodes, node_name).toList
-    def statuses(names: Set[Document.Node.Name]): List[PIDE_AI_Theory.Status] =
-      PIDE_AI_Theory.Status.statuses(snapshot, dynamic_thys.filter(names -- thys))
-    val ancestors = request.show_ancestor_thys.select(
-      statuses(PIDE_AI_Dependencies.known_dependencies(resources, nodes, thys).toSet))
-    val descendants =
-      request.show_descendant_thys.select(statuses(nodes.descendants(thys).toSet))
-    val other_cmds_processing =
-      if (!request.show_other_cmds_processing.show(summary)) JSON.Object.empty
-      else {
-        val cmds = selection.parts.map(_._1).toSet
-        val selections = PIDE_AI_Document_Command.Selection.nodes(session, snapshot, dynamic_thys)
-          .map((node_snapshot, node_selection) =>
-            node_snapshot -> node_selection.filter((cmd, _) => !cmds(cmd)))
-        val node_problems = PIDE_AI_Document_Command.status_problems(selections,
-          PIDE_AI_Document_Command.Status.running, session.unicode_symbols)
-        PIDE_AI_Document_Command.node_problems_json(resources, node_problems, 1, cwd)
-      }
-    summary ++ JSON_Object.flatten(Option.when(edited > 0)("cmds_edited_omitted" -> edited),
-      Option.when(timed_out)("timed_out" -> true),
-      Option.when(ancestors.nonEmpty)(
-        "ancestors" -> PIDE_AI_Theory.Status.statuses_json(resources, ancestors, cwd)),
-      Option.when(descendants.nonEmpty)(
-        "descendants" -> PIDE_AI_Theory.Status.statuses_json(resources, descendants, cwd)),
-      Option.when(other_cmds_processing.nonEmpty)(
-        other_cmds_processing_key -> other_cmds_processing))
+          get_state_delay(session.options), get_state_check_factor(session.options),
+          (snapshot, states) => JSON.Format(json(snapshot, states.toList, 0, false)),
+          request.progress_delay.getOrElse(get_state_progress_delay(session.options)), progress)
+      json(snapshot, states.toList, edited, timed_out)
+    }
   }
 }
 

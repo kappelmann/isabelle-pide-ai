@@ -13,7 +13,7 @@ object PIDE_AI_Session_State {
   }
 
   sealed case class Show(
-    cmds_processing: Boolean,
+    cmds_running: Boolean,
     dynamic_thys: Show.Dynamic_Thys,
     base_session_thys: Boolean,
     session_dirs: Boolean,
@@ -44,14 +44,14 @@ object PIDE_AI_Session_State {
   def ml_heap_collected(props: Properties.T): Boolean =
     List(ML_Statistics.GCs_Minor, ML_Statistics.GCs_Major).exists(_.unapply(props).exists(_ > 0))
 
-  private def space_entry(key: String, bytes: Option[Double]): Option[(String, JSON.T)] =
+  private def space_entry(key: String, bytes: Option[Double]): Option[JSON.Object.Entry] =
     bytes.map(bytes => key -> Space.B(bytes).print)
 
   private def space_average_maximum(
     ml: ML_Statistics,
     key: String,
     field: ML_Statistics.Field
-  ): List[Option[(String, JSON.T)]] = {
+  ): List[Option[JSON.Object.Entry]] = {
     def entry(suffix: String, aggregate: ML_Statistics => Double) =
       Option.when(ml.content.nonEmpty)(key + suffix -> Space.MiB(aggregate(ml)).print)
     List(entry("_average", _.average(field)), entry("_maximum", _.maximum(field)))
@@ -61,7 +61,7 @@ object PIDE_AI_Session_State {
     props: Properties.T,
     key: String,
     field: ML_Statistics.Field
-  ): Option[(String, JSON.T)] =
+  ): Option[JSON.Object.Entry] =
     field.unapply(props).map(count => key -> count.toLong)
 
   def ml_stats_json(statistics: List[Properties.T]): JSON.Object.T = {
@@ -102,6 +102,7 @@ object PIDE_AI_Session_State {
     session: PIDE_AI_Session,
     origins: Option[List[String]],
     show: Show,
+    long_running_threshold: Time,
     cwd: Option[Path]
   ): JSON.Object.T = {
     lazy val snapshot = session.snapshot()
@@ -115,19 +116,19 @@ object PIDE_AI_Session_State {
     def print_origins(names: List[Document.Node.Name]): List[String] =
       names.map(session.print_origin(_, cwd))
     JSON_Object("session_id" -> session.id, "base_session" -> session.base_session) ++
-    JSON.optional(PIDE_AI_Document_Command.Status.key(PIDE_AI_Document_Command.Status.running.name) ->
-      Option.when(show.cmds_processing) {
-        PIDE_AI_Document_Command.node_problems_json(session.resources,
-          PIDE_AI_Document_Command.status_problems(
-            PIDE_AI_Document_Command.Selection.nodes(session, snapshot, dynamic_thys),
-            PIDE_AI_Document_Command.Status.running, session.unicode_symbols), 1, cwd)
+    JSON.optional(
+      PIDE_AI_Document_Command.States.cmds_key(PIDE_AI_Command_Status.running.name) ->
+      Option.when(show.cmds_running) {
+        PIDE_AI_Document_Command.nodes_running_json(session.resources,
+          PIDE_AI_Document_Command.Selection.nodes(session, snapshot, dynamic_thys),
+          1, long_running_threshold, cwd)
       }.filter(_.nonEmpty)) ++
     (show.dynamic_thys match {
       case Show.Dynamic_Thys.none => JSON.Object.empty
       case Show.Dynamic_Thys.names => JSON_Object("thys" -> print_origins(dynamic_thys))
       case Show.Dynamic_Thys.summary =>
-        PIDE_AI_Theory.Status.statuses_json(session.resources,
-          PIDE_AI_Theory.Status.statuses(snapshot, dynamic_thys), cwd)
+        PIDE_AI_Theory.Statuses.json(session.resources,
+          PIDE_AI_Theory.Statuses(snapshot, dynamic_thys), cwd)
     }) ++
     JSON.optional("base_session_thys" ->
       Option.when(show.base_session_thys)(print_origins(theories.base_session))) ++
