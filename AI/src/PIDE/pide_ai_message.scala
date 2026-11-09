@@ -7,6 +7,7 @@ Message utilities.
 package isabelle.pide.ai
 
 import isabelle._
+import isabelle.symbols.Symbols
 
 object PIDE_AI_Message {
   object Kind {
@@ -26,6 +27,10 @@ object PIDE_AI_Message {
     case information extends Kind(Protocol.is_information)
     case tracing extends Kind(Protocol.is_tracing)
   }
+
+  def sendbacks(messages: XML.Body, unicode_symbols: Boolean): List[String] =
+    Protocol.sendback_snippets(messages).map((text, _) =>
+      Symbols.output_decoded(unicode_symbols, text))
 
   def output_message(
     snapshot: Document.Snapshot,
@@ -86,6 +91,9 @@ sealed case class PIDE_AI_Message(
   snapshot: Document.Snapshot,
   cmd: Option[Command]
 ) {
+  def sendbacks(unicode_symbols: Boolean): List[String] =
+    PIDE_AI_Message.sendbacks(List(elem), unicode_symbols)
+
   def text(unicode_symbols: Boolean, cwd: Option[Path]): String =
     PIDE_AI_Util.elem_body_plain_text(
       cmd.fold(elem)(PIDE_AI_Message.output_message(snapshot, _, elem, cwd)), unicode_symbols)

@@ -26,4 +26,4 @@ Paths are relative to a working directory (MCP: dir at connection, CLI: CWD).
 - Errors appear in two forms: error messages and failed commands. A failed command might not have an error message.
 - Request only information you need and set limits: details for a whole theory flood your context.
 - Only commands in the PIDE perspective run automatically tried tools (e.g. quickcheck, solve_direct).
-- Isar diagnostic commands (try0, sledgehammer, print_facts, find_theorems,...) work: their output appears under infos in get_state (poll or use timeout).
+- Isar diagnostic commands (try0, print_facts, find_theorems,...): their output appears as info in get_state.

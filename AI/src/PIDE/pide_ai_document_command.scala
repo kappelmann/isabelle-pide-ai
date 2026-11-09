@@ -115,7 +115,7 @@ object PIDE_AI_Document_Command {
   }
 
   object State {
-    enum Detail { case errors, warnings, infos, goals, src, types, facts, markup }
+    enum Detail { case errors, warnings, infos, goals, src, types, facts, sendbacks, markup }
 
     object Detail {
       def of(kind: PIDE_AI_Message.Kind): Detail =
@@ -193,6 +193,9 @@ object PIDE_AI_Document_Command {
           Option.when(details(State.Detail.facts))(
             proper_list(PIDE_AI_Markup.facts_json(snapshot, range, unicode_symbols))
               .map("facts" -> _)).flatten,
+          Option.when(details(State.Detail.sendbacks))(
+            proper_list(messages.flatMap(_.sendbacks(unicode_symbols))).map("sendbacks" -> _))
+            .flatten,
           Option.when(details(State.Detail.markup))(
             "markup" -> PIDE_AI_Markup.markup_json(snapshot, range, Markup.Elements.full,
               unicode_symbols)))

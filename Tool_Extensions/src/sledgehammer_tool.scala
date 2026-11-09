@@ -29,7 +29,7 @@ class Sledgehammer_Tool extends PIDE_AI_Tool("sledgehammer") with PIDE_AI_Tool.R
     "try0", "Try integrated provers with found facts before external ones.",
     JSON_Schema.Format.bool, true)
   val proofs_limit_arg = JSON_Schema.Arg.default(
-    "proofs_limit", "Proofs to be found.", JSON_Schema.Format.int(minimum = Some(1)), 1)
+    "proofs_limit", "Distinct proofs to be found.", JSON_Schema.Format.int(minimum = Some(1)), 1)
   val timeout_arg = JSON_Schema.Arg.optional(
     "timeout", "Seconds before cancellation.",
     JSON_Schema.Format.int(minimum = Some(1)).map(Time.seconds(_), _.seconds.toInt))
@@ -57,8 +57,8 @@ class Sledgehammer_Tool extends PIDE_AI_Tool("sledgehammer") with PIDE_AI_Tool.R
     range.start + caret
   }
 
-  private def proofs_count(output: Editor.Output): Int =
-    output.messages.count(msg => Protocol.sendback_snippets(List(msg)).nonEmpty)
+  private def proofs(output: Editor.Output, unicode_symbols: Boolean): List[String] =
+    PIDE_AI_Message.sendbacks(output.messages, unicode_symbols).distinct
 
   def handle(
     server: PIDE_AI_Server,
@@ -81,10 +81,11 @@ class Sledgehammer_Tool extends PIDE_AI_Tool("sledgehammer") with PIDE_AI_Tool.R
       val query_args = List(provers,
         Value.Boolean(isar_proofs_arg.get(args)), Value.Boolean(try0_arg.get(args)))
       val proofs_limit = proofs_limit_arg.get(args)
-      new PIDE_AI_Query(session, editor_context, "sledgehammer", progress, cwd)
+      val result = new PIDE_AI_Query(session, editor_context, "sledgehammer", progress, cwd)
         .run(query_args, timeout_arg.get(args),
-          stop = output => proofs_count(output) >= proofs_limit)
-        .json(PIDE_AI_Message.Kind.values.toList, session.unicode_symbols, cwd)
+          stop = output => proofs(output, session.unicode_symbols).length >= proofs_limit)
+      result.json(PIDE_AI_Message.Kind.values.toList, session.unicode_symbols, cwd) ++
+      JSON.optional("proofs" -> proper_list(proofs(result.output, session.unicode_symbols)))
     }
 }
 
