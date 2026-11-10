@@ -20,7 +20,7 @@ option pide_ai_range_context : int = 50 for pide_ai
 option pide_ai_unicode_symbols : bool = true for pide_ai
   -- "represent Isabelle symbols via Unicode"
 
-option pide_ai_unicode_symbols_disk : bool = false for pide_ai
+option pide_ai_unicode_symbols_disk : bool = true for pide_ai
   -- "represent Isabelle symbols on disk via Unicode"
 
 

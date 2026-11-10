@@ -49,6 +49,10 @@ object PIDE_AI_Session {
       progress = new Silent_Progress(progress),
       dirs = spec.dirs, session_ancestor = spec.session_ancestor,
       session_requirements = spec.session_requirements).check_errors
+    val encoded = Symbols.recode_sessions(unicode_symbols = false,
+      session_background.sessions_structure, List(session_background.session_name))
+    if (encoded.nonEmpty) progress.echo("Encoded symbols before build in: " +
+      commas(encoded.map(path => quote(path.implode))))
     Build.build(options, selection = Sessions.Selection.session(session_background.session_name),
       build_heap = true, dirs = spec.dirs, infos = session_background.infos,
       fresh_build = spec.fresh_build, no_build = spec.no_build,

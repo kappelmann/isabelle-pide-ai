@@ -43,10 +43,12 @@ To interactively explore the agent's changes, you may also run an Isabelle/jEdit
     Vice versa, **if a file is edited via the server, you may need to manually reload the file in your editor** in case the editor does not auto-reload on disk changes.
     In Isabelle/jEdit, it is sometimes necessary to reload manually (e.g. by using the F5 key). Isabelle/VSCode supports auto-reload. 
     Avoid editing a file while the agent works on it. You might have to merge conflicts by hand otherwise.
+- **By default, the server uses Isabelle symbols via Unicode (e.g. `∀`), including on disk**.
+    This is done in order to save tokens when agents read and edit files directly.
+    Use options `pide_ai_unicode_symbols_disk` and `pide_ai_unicode_symbols` to change the defaults.
+    Note that some Isabelle tools, particularly `isabelle build`, require ASCII (e.g. `\<forall>`).
+    The server automatically converts sources to ASCII before builds. Elsewhere, use `isabelle symbols` to recode files and sessions.
 - If you want the agent to see proof states in pre-built base sessions, you have to build them with `-o show_states`. Note that such builds take significantly longer!
-- By default, the server uses Isabelle symbols via Unicode (e.g. `∀`) and writes them to disk as ASCII (e.g. `\<forall>`), as required by batch Isabelle tools like `isabelle build`.
-    Use options `pide_ai_unicode_symbols` and `pide_ai_unicode_symbols_disk` to change either representation.
-    The tool `isabelle symbols -d|-e FILES` converts files in either direction.
 - PIDE AI clients pass a working directory to the server. Paths are read and printed relative to it.
 
 ## Installing PIDE AI
