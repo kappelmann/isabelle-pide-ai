@@ -12,8 +12,7 @@ class Get_Session_State_Tool extends PIDE_AI_Tool("get_session_state")
 with PIDE_AI_Tool.Read_Only {
   def description: String =
     "State of running sessions, information for their theories " +
-    "(status, commands being processed,...), resource statistics,... " +
-    "Sorrys are not listed."
+    "(status, commands being processed,...), resource statistics,..."
 
   val filter_nodes_arg = JSON_Schema.Arg.default(
     "filter_nodes",
@@ -24,10 +23,14 @@ with PIDE_AI_Tool.Read_Only {
     VectorMap.empty)
   val show_cmds_running_arg = JSON_Schema.Arg.default(
     "show_cmds_processing", "", JSON_Schema.Format.bool, true)
-  val show_dynamic_thys_arg = JSON_Schema.Arg.default(
-    "show_dynamic_thys", s"${quote("summary")}: status, progress, command counts.",
-    JSON_Schema.Format.enumeration(PIDE_AI_Session_State.Show.Dynamic_Thys.values),
-    PIDE_AI_Session_State.Show.Dynamic_Thys.summary)
+  val show_terminated_slow_arg = JSON_Schema.Arg.default(
+    "show_terminated_slow", s"Above ${PIDE_AI_Tool_Schema.long_running_arg.name}.",
+    JSON_Schema.Format.bool, false)
+  val show_bad_arg = JSON_Schema.Arg.default(
+    "show_bad", "Show bad markup positions. Slow for large theories.",
+    JSON_Schema.Format.bool, false)
+  val show_dynamic_thys_arg = PIDE_AI_Tool_Schema.show_thy_statuses_arg(
+    "show_dynamic_thys", PIDE_AI_Theory_Status.Statuses.Show.not_ok)
   val show_base_session_thys_arg = JSON_Schema.Arg.default(
     "show_base_session_thys", "", JSON_Schema.Format.bool, false)
   val show_session_dirs_arg = JSON_Schema.Arg.default(
@@ -46,8 +49,8 @@ with PIDE_AI_Tool.Read_Only {
 
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(
     List(PIDE_AI_Tool_Schema.running_sessions_arg, filter_nodes_arg,
-      show_cmds_running_arg, PIDE_AI_Tool_Schema.long_running_arg,
-      show_dynamic_thys_arg, show_base_session_thys_arg,
+      show_cmds_running_arg, show_terminated_slow_arg, PIDE_AI_Tool_Schema.long_running_arg,
+      show_bad_arg, show_dynamic_thys_arg, show_base_session_thys_arg,
       show_session_dirs_arg, show_options_arg, show_statistics_arg))
 
   def handle(
@@ -67,6 +70,8 @@ with PIDE_AI_Tool.Read_Only {
       }
       val show = PIDE_AI_Session_State.Show(
         cmds_running = show_cmds_running_arg.get(args),
+        terminated_slow = show_terminated_slow_arg.get(args),
+        bad = show_bad_arg.get(args),
         dynamic_thys = show_dynamic_thys_arg.get(args),
         base_session_thys = show_base_session_thys_arg.get(args),
         session_dirs = show_session_dirs_arg.get(args),

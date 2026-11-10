@@ -7,8 +7,8 @@ package isabelle.pide.ai
 import isabelle._
 
 class Stop_Session_Tool extends PIDE_AI_Tool("stop_session") with PIDE_AI_Tool.Destructive {
-  def description: String = "Stop sessions. " +
-    PIDE_AI_Tool_Schema.session_restart
+  def description: String =
+    "Stop sessions. Use only when required: unresponsiveness or ROOT or base session updates."
 
   val sessions_arg = JSON_Schema.Arg.optional(
     "session_ids", "Default: all stoppable ones.",

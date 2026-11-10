@@ -59,8 +59,14 @@ object Edit_Tool {
           if (request.edit_all) matches else List(matches.head)
         }
       val replaced_ranges = offsets.map(replaced_range(request.mode, _, actual_old_text.length))
-      val computed_text = replaced_ranges.reverseIterator.foldLeft(current_text) { (text, range) =>
-        text.take(range.start) + new_text + text.drop(range.stop)
+      val computed_text = Library.string_builder(current_text.length) { text =>
+        var start = 0
+        for (range <- replaced_ranges) {
+          text ++= current_text.substring(start, range.start).nn
+          text ++= new_text
+          start = range.stop
+        }
+        text ++= current_text.substring(start).nn
       }
       val changed = computed_text != current_text
       val edited_doc = Line.Document(computed_text)
@@ -81,7 +87,7 @@ object Edit_Tool {
     }
   }
 
-  enum Edited_Ranges { case none, each, bounding_box }
+  enum Edited_Lines { case none, each, bounding_box }
 
   val base_description = "Edit matching text in a given range."
 
@@ -95,14 +101,14 @@ object Edit_Tool {
   val edit_all_arg = JSON_Schema.Arg.default(
     "edit_all", "Edit every match or a unique occurrence.", JSON_Schema.Format.bool,
     false)
-  val show_edited_ranges_arg = JSON_Schema.Arg.default(
-    "show_edited_ranges", "",
-    JSON_Schema.Format.enumeration(Edited_Ranges.values), Edited_Ranges.bounding_box)
+  val show_edited_lines_arg = JSON_Schema.Arg.default(
+    "show_edited_lines", "",
+    JSON_Schema.Format.enumeration(Edited_Lines.values), Edited_Lines.bounding_box)
 
   val edit_args: List[JSON_Schema.Arg[?]] = List(PIDE_AI_Tool_Schema.running_session_arg,
     PIDE_AI_Tool_Schema.node_arg, mode_arg, text_arg,
     PIDE_AI_Tool_Schema.start_line_default_arg, PIDE_AI_Tool_Schema.opt_end_line_arg,
-    old_text_arg, edit_all_arg, show_edited_ranges_arg)
+    old_text_arg, edit_all_arg, show_edited_lines_arg)
 
   def read_update_edit(
     session: PIDE_AI_Session,
@@ -117,15 +123,16 @@ object Edit_Tool {
       PIDE_AI_Tool_Schema.start_line_default_arg.get(args),
       PIDE_AI_Tool_Schema.opt_end_line_arg.get(args), pide_text(old_text_arg),
       edit_all_arg.get(args))
+    val show_edited_lines = show_edited_lines_arg.get(args)
     val edited_lines = edit(session, node_name, request, progress, cwd)
-    val ranges = show_edited_ranges_arg.get(args) match {
-      case Edited_Ranges.none => None
-      case Edited_Ranges.bounding_box => PIDE_AI_Util.line_ranges_span(edited_lines)
+    val shown_lines = show_edited_lines match {
+      case Edited_Lines.none => None
+      case Edited_Lines.bounding_box => PIDE_AI_Util.line_ranges_span(edited_lines)
         .map(PIDE_AI_Util.line_range)
-      case Edited_Ranges.each => proper_list(edited_lines.map(PIDE_AI_Util.line_range))
+      case Edited_Lines.each => proper_list(edited_lines.map(PIDE_AI_Util.line_range))
     }
     val json = JSON_Object("edits" -> edited_lines.length) ++
-      JSON.optional("edited_ranges" -> ranges) ++ JSON_Object.if_proper(edited_lines.isEmpty,
+      JSON.optional("edited_lines" -> shown_lines) ++ JSON_Object.if_proper(edited_lines.isEmpty,
         JSON_Object("note" -> "The edit left the text unchanged."))
     (edited_lines, json)
   }

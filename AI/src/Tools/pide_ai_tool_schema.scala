@@ -13,8 +13,6 @@ object PIDE_AI_Tool_Schema {
   val implicit_reload_file: String = "(Re)loads file."
   val range_perspective: String = "Moves PIDE perspective to range."
   val no_processing_wait: String = "Does not wait for commands to terminate."
-  val session_restart: String = "Use only when required: " +
-    "unresponsiveness or ROOT or base session updates."
 
   val running_session_arg = JSON_Schema.Arg.optional(
     "session_id", "Default: unique running one.",
@@ -32,9 +30,15 @@ object PIDE_AI_Tool_Schema {
   val opt_end_line_arg = JSON_Schema.Arg.optional(
     "end_line", "Default: end of file.", JSON_Schema.Format.int(minimum = Some(1)))
 
-  val seconds_format: JSON_Schema.Format[Time] =
-    JSON_Schema.Format.real(minimum = Some(0)).map(Time.seconds(_), _.seconds)
-  val long_running_arg = JSON_Schema.Arg.optional("long_running",
-    s"Threshold in seconds. Default: ${PIDE_AI_Session.long_running_threshold_option}.",
-    seconds_format)
+  def ms_format(minimum: Int): JSON_Schema.Format[Time] =
+    JSON_Schema.Format.int(minimum = Some(minimum)).map(Time.ms(_), _.ms.toInt)
+  val long_running_arg = JSON_Schema.Arg.optional("long_running_ms",
+    s"Threshold. Default: ${PIDE_AI_Session.long_running_threshold_option}.", ms_format(0))
+
+  def show_thy_statuses_arg(
+    name: String,
+    default: PIDE_AI_Theory_Status.Statuses.Show
+  ): JSON_Schema.Arg[PIDE_AI_Theory_Status.Statuses.Show] =
+    JSON_Schema.Arg.default(name, "Status, names, or nothing.",
+      JSON_Schema.Format.enumeration(PIDE_AI_Theory_Status.Statuses.Show.values), default)
 }

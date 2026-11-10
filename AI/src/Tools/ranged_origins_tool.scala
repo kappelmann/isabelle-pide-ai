@@ -8,7 +8,7 @@ import isabelle._
 
 object Ranged_Origins_Tool {
   enum Kind(val markups: List[String], val hint: String = "") {
-    case facts extends Kind(
+    case fact extends Kind(
       List(Markup.FACT, Markup.DYNAMIC_FACT, Markup.LITERAL_FACT, Markup.AXIOM))
     case constant extends Kind(List(Markup.CONSTANT))
     case type_name extends Kind(List(Markup.TYPE_NAME))
@@ -47,7 +47,7 @@ class Ranged_Origins_Tool extends PIDE_AI_Tool("ranged_origins") with PIDE_AI_To
       .map(kind => kind.name + " = " + kind.hint).mkString("; ") + ".",
     JSON_Schema.Format.list(
       JSON_Schema.Format.enumeration(Ranged_Origins_Tool.Kind.values, _.name)),
-    List(Ranged_Origins_Tool.Kind.facts, Ranged_Origins_Tool.Kind.constant,
+    List(Ranged_Origins_Tool.Kind.fact, Ranged_Origins_Tool.Kind.constant,
       Ranged_Origins_Tool.Kind.type_name, Ranged_Origins_Tool.Kind.`class`))
 
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(

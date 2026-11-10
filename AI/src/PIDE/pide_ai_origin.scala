@@ -113,10 +113,11 @@ object PIDE_AI_Origin {
         groups.updated(node, origin :: groups.getOrElse(node, Nil))
     }
     grouped.map { (node, entries) =>
-      val sites = entries.sortBy(entry => (entry.line, entry.name, entry.kind))
+      def key(entry: PIDE_AI_Origin) = (entry.line, entry.name, entry.kind, entry.def_label)
+      val sites = entries.distinctBy(key).sortBy(key)
         .foldRight(List.empty[List[PIDE_AI_Origin]]) {
-          case (entry, (site @ next :: rest) :: sites) if next.line == entry.line =>
-            (entry :: (if (next.name == entry.name) rest else site)) :: sites
+          case (entry, (site @ next :: _) :: sites) if next.line == entry.line =>
+            (entry :: site) :: sites
           case (entry, sites) => List(entry) :: sites
         }
       node -> sites.map(site =>

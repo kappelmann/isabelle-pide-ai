@@ -63,6 +63,9 @@ object PIDE_AI_Session {
       build_heap = true, dirs = spec.dirs, infos = session_background.infos,
       fresh_build = spec.fresh_build, no_build = spec.no_build,
       progress = new Recode_Progress(progress, unicode_symbols))
+    if (spec.no_build && !results.ok)
+      error("Missing or outdated heap image for session(s): " +
+        commas_quote(results.unfinished))
     try { results.check }
     catch {
       case ERROR(msg) =>

@@ -17,6 +17,12 @@ object PIDE_AI_Document_Command {
     is_ignorable(snapshot, cmd) &&
     PIDE_AI_Command_Status.command_status(snapshot, cmd).is_terminated
 
+  def is_terminated_slow(
+    status: Document_Status.Command_Status,
+    threshold: Time,
+    now: Date
+  ): Boolean = status.is_terminated && status.timings.sum(now) >= threshold
+
   def snapshot_contains(snapshot: Document.Snapshot, cmd: Command): Boolean =
     snapshot.command_node(cmd).commands.contains(cmd)
 
@@ -108,9 +114,6 @@ object PIDE_AI_Document_Command {
           if (pred(cmd -> range)) this else Selection.commands(Nil)
         case Selection.commands(cmds) => Selection.commands(cmds.filter(pred))
       }
-
-    def filter_status(snapshot: Document.Snapshot, status: PIDE_AI_Command_Status): Selection =
-      filter((cmd, _) => PIDE_AI_Command_Status.statuses(snapshot, cmd).contains(status))
   }
 
   object State {
@@ -238,12 +241,13 @@ object PIDE_AI_Document_Command {
       apply(snapshot, Selection(snapshot, range))
 
     sealed case class Show(
-      details: Set[State.Detail],
       message_kinds: List[PIDE_AI_Message.Kind],
-      problematic_limit: Option[Int],
-      unproblematic_limit: Option[Int],
+      terminated_slow: Boolean,
       summary_limit: Option[Int],
-      snippet_lines: Int)
+      snippet_lines: Int,
+      details: Set[State.Detail],
+      problematic_limit: Option[Int],
+      unproblematic_limit: Option[Int])
 
     def counted_summary(count: Int)(summary: => JSON.Object.T): Option[JSON.Object.T] =
       Option.when(count > 0)(JSON_Object("count" -> count) ++ summary)
@@ -267,6 +271,16 @@ object PIDE_AI_Document_Command {
       JSON_Object("snippets" -> ranges.map(PIDE_AI_Util.snippet(doc, _, snippet_lines))) ++
       JSON.optional("message" -> proper_string(message))
 
+    def terminated_slow_json(
+      states: List[State],
+      doc: Line.Document,
+      snippet_lines: Int,
+      long_running_threshold: Time
+    ): JSON.Object.T =
+      JSON_Object("items" -> states.sortBy(_.timing_ms)(Ordering[Long].reverse).map(state =>
+        JSON_Object("status" -> state.status.map(_.name)) ++
+        state_item_json(state, doc, snippet_lines, long_running_threshold)))
+
     def running_json(
       states: List[State],
       doc: Line.Document,
@@ -277,8 +291,7 @@ object PIDE_AI_Document_Command {
         states.partition(_.is_long_running(long_running_threshold))
       JSON_Object.flatten(
         Option.when(long_running.nonEmpty)("long_running" ->
-          long_running.sortBy(_.timing_ms)(Ordering[Long].reverse)
-            .map(state_item_json(_, doc, snippet_lines, long_running_threshold))),
+          long_running.map(state_item_json(_, doc, snippet_lines, long_running_threshold))),
         Option.when(short_running.nonEmpty)("short_running_lines" ->
           short_running.map(state => PIDE_AI_Util.range_lines(doc, state.range))
             .map(PIDE_AI_Util.line_range)))
@@ -362,10 +375,16 @@ object PIDE_AI_Document_Command {
         Some("total_timing_ms" -> states.map(_.timing_ms).sum) ::
         summary_entry(cmds_key(PIDE_AI_Command_Status.running.name), running.length)(
           running_json(running, doc, show.snippet_lines, long_running_threshold)) ::
+        Option.when(show.terminated_slow) {
+          val now = Date.now()
+          val terminated_slow = states.filter(state =>
+            is_terminated_slow(state.command_status, long_running_threshold, now))
+          summary_entry(cmds_key("terminated_slow"), terminated_slow.length)(
+            terminated_slow_json(terminated_slow, doc, show.snippet_lines, long_running_threshold))
+        }.flatten ::
         PIDE_AI_Command_Status.values.toList.filter(PIDE_AI_Command_Status.problematic)
-          .map(status =>
-            items_entry(cmds_key(status.name), status_counts(status),
-              status.message_kind)) :::
+          .map(status => items_entry(cmds_key(status.name), status_counts(status),
+            status.message_kind)) :::
         items_entry(Markup.BAD, states.map(_.bad.length).sum, None) ::
         show.message_kinds.map(kind =>
           items_entry(PIDE_AI_Message.Messages.key(kind), message_counts(kind), None)) :::
@@ -381,6 +400,19 @@ object PIDE_AI_Document_Command {
     }
   }
 
+  def nodes_states_json(
+    resources: PIDE_AI_Resources,
+    selections: List[(Document.Snapshot, Selection)],
+    pred: Document_Status.Command_Status => Boolean,
+    cwd: Option[Path]
+  )(json: (Document.Snapshot, List[State]) => JSON.Object.T): JSON.Object.T =
+    JSON_Object.flatten(selections.map { (snapshot, selection) =>
+      val states = States(snapshot, selection.filter((cmd, _) =>
+        pred(PIDE_AI_Command_Status.command_status(snapshot, cmd)))).toList
+      States.counted_summary(states.length)(json(snapshot, states))
+        .map(resources.print_node_name(snapshot.node_name, cwd) -> _)
+    })
+
   def nodes_running_json(
     resources: PIDE_AI_Resources,
     selections: List[(Document.Snapshot, Selection)],
@@ -388,12 +420,32 @@ object PIDE_AI_Document_Command {
     long_running_threshold: Time,
     cwd: Option[Path]
   ): JSON.Object.T =
-    JSON_Object.flatten(selections.map { (snapshot, selection) =>
-      val states =
-        States(snapshot, selection.filter_status(snapshot, PIDE_AI_Command_Status.running)).toList
-      States.counted_summary(states.length)(
-        States.running_json(states, Line.Document(snapshot.node.source),
-          snippet_lines, long_running_threshold))
+    nodes_states_json(resources, selections, _.is_running, cwd)((snapshot, states) =>
+      States.running_json(states, Line.Document(snapshot.node.source), snippet_lines,
+        long_running_threshold))
+
+  def nodes_terminated_slow_json(
+    resources: PIDE_AI_Resources,
+    selections: List[(Document.Snapshot, Selection)],
+    snippet_lines: Int,
+    long_running_threshold: Time,
+    cwd: Option[Path]
+  ): JSON.Object.T = {
+    val now = Date.now()
+    nodes_states_json(resources, selections, is_terminated_slow(_, long_running_threshold, now),
+      cwd)((snapshot, states) => States.terminated_slow_json(states,
+        Line.Document(snapshot.node.source), snippet_lines, long_running_threshold))
+  }
+
+  def nodes_bad_json(
+    resources: PIDE_AI_Resources,
+    selections: List[(Document.Snapshot, Selection)],
+    cwd: Option[Path]
+  ): JSON.Object.T =
+    JSON_Object(selections.flatMap { (snapshot, _) =>
+      val doc = Line.Document(snapshot.node.source)
+      proper_list(PIDE_AI_Markup.bad(snapshot, Text.Range.full).map(info =>
+        PIDE_AI_Util.line_range.tupled(PIDE_AI_Util.range_lines(doc, info.range))).distinct)
         .map(resources.print_node_name(snapshot.node_name, cwd) -> _)
     })
 

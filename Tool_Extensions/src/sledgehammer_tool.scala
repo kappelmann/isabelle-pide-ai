@@ -31,8 +31,7 @@ class Sledgehammer_Tool extends PIDE_AI_Tool("sledgehammer") with PIDE_AI_Tool.R
   val proofs_limit_arg = JSON_Schema.Arg.default(
     "proofs_limit", "Distinct proofs to be found.", JSON_Schema.Format.int(minimum = Some(1)), 1)
   val timeout_arg = JSON_Schema.Arg.optional(
-    "timeout", "Seconds before cancellation.",
-    JSON_Schema.Format.int(minimum = Some(1)).map(Time.seconds(_), _.seconds.toInt))
+    "timeout_ms", "Before cancellation.", PIDE_AI_Tool_Schema.ms_format(1))
 
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(
     List(PIDE_AI_Tool_Schema.running_session_arg, PIDE_AI_Tool_Schema.node_arg,

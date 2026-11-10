@@ -8,13 +8,14 @@ import isabelle._
 
 object PIDE_AI_Session_State {
   object Show {
-    enum Dynamic_Thys { case none, names, summary }
     enum Options { case none, changed, all }
   }
 
   sealed case class Show(
     cmds_running: Boolean,
-    dynamic_thys: Show.Dynamic_Thys,
+    terminated_slow: Boolean,
+    bad: Boolean,
+    dynamic_thys: PIDE_AI_Theory_Status.Statuses.Show,
     base_session_thys: Boolean,
     session_dirs: Boolean,
     options: Show.Options,
@@ -113,22 +114,23 @@ object PIDE_AI_Session_State {
         val selected = nodes.map(session.resources.node_name(_, cwd)).toSet
         theories.dynamic.filter(selected.contains)
     }
+    lazy val selections =
+      PIDE_AI_Document_Command.Selection.nodes(session, snapshot, dynamic_thys)
     def print_nodes(names: List[Document.Node.Name]): List[String] =
       names.map(session.resources.print_node_name(_, cwd))
+    def optional_entry(key: String, shown: Boolean)(json: => JSON.Object.T): JSON.Object.T =
+      JSON.optional(key -> Option.when(shown)(json).filter(_.nonEmpty))
     JSON_Object("session_id" -> session.id, "base_session" -> session.base_session) ++
-    JSON.optional(
-      PIDE_AI_Document_Command.States.cmds_key(PIDE_AI_Command_Status.running.name) ->
-      Option.when(show.cmds_running) {
-        PIDE_AI_Document_Command.nodes_running_json(session.resources,
-          PIDE_AI_Document_Command.Selection.nodes(session, snapshot, dynamic_thys),
-          1, long_running_threshold, cwd)
-      }.filter(_.nonEmpty)) ++
-    (show.dynamic_thys match {
-      case Show.Dynamic_Thys.none => JSON.Object.empty
-      case Show.Dynamic_Thys.names => JSON_Object("thys" -> print_nodes(dynamic_thys))
-      case Show.Dynamic_Thys.summary => PIDE_AI_Theory_Status.Statuses.json(session.resources,
-        PIDE_AI_Theory_Status.Statuses(snapshot, dynamic_thys), cwd)
-    }) ++
+    optional_entry(PIDE_AI_Document_Command.States.cmds_key(PIDE_AI_Command_Status.running.name),
+      show.cmds_running)(PIDE_AI_Document_Command.nodes_running_json(session.resources,
+        selections, 1, long_running_threshold, cwd)) ++
+    optional_entry(PIDE_AI_Document_Command.States.cmds_key("terminated_slow"),
+      show.terminated_slow)(PIDE_AI_Document_Command.nodes_terminated_slow_json(
+        session.resources, selections, 1, long_running_threshold, cwd)) ++
+    optional_entry(Markup.BAD, show.bad)(
+      PIDE_AI_Document_Command.nodes_bad_json(session.resources, selections, cwd)) ++
+    PIDE_AI_Theory_Status.Statuses.json(session.resources,
+      PIDE_AI_Theory_Status.Statuses(snapshot, dynamic_thys), show.dynamic_thys, cwd) ++
     JSON.optional("base_session_thys" ->
       Option.when(show.base_session_thys)(print_nodes(theories.base_session))) ++
     JSON.optional("session_dirs" -> Option.when(show.session_dirs)(

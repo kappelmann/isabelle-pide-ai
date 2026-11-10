@@ -11,7 +11,7 @@ class Edit_Get_State_Tool extends PIDE_AI_Tool("edit_get_state") with PIDE_AI_To
     Edit_Tool.base_description + " " + Get_State_Tool.base_description("edited commands") + " " +
     PIDE_AI_Tool_Schema.range_perspective + " " + PIDE_AI_Tool_Schema.implicit_reload_file
 
-  val timeout_arg = Get_State_Tool.Request.timeout_arg(5)
+  val timeout_arg = Get_State_Tool.Request.timeout_arg(Time.seconds(5))
 
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(
     Edit_Tool.edit_args ::: Get_State_Tool.Request.args(timeout_arg))

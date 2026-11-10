@@ -24,33 +24,38 @@ class Create_Scratch_Tool extends PIDE_AI_Tool("create_scratch") {
 
   private val scratch_prefix: String = "Scratch_"
   private val scratch_tmpdir_prefix: String = "tmp_pide_ai_scratch"
-  private val scratch_dirs = Synchronized[Map[String, JFile]](Map.empty)
+  private val scratch_dirs = Synchronized[Map[PIDE_AI_Session, Option[JFile]]](Map.empty)
 
-  private def get_scratch_dir(session_id: String): JFile =
+  override def started(event: PIDE_AI_Service.Session_Event): Unit =
+    scratch_dirs.change(_ + (event.session -> None))
+
+  private def get_scratch_dir(session: PIDE_AI_Session): JFile =
     scratch_dirs.change_result { dirs =>
-      dirs.get(session_id) match {
-        case Some(dir) if dir.isDirectory => (dir, dirs)
+      dirs.get(session) match {
+        case None =>
+          error(s"Cannot create scratch file: session ${quote(session.id)} is not running")
+        case Some(Some(dir)) if dir.isDirectory => (dir, dirs)
         case _ =>
           val dir = Isabelle_System.tmp_dir(scratch_tmpdir_prefix)
-          (dir, dirs + (session_id -> dir))
+          (dir, dirs + (session -> Some(dir)))
       }
     }
 
   override def stopping(event: PIDE_AI_Service.Session_Event): Unit = {
-    val id = event.session.id
-    val dir = scratch_dirs.change_result(dirs => (dirs.get(id), dirs - id))
+    val dir = scratch_dirs.change_result(dirs =>
+      (dirs.get(event.session).flatten, dirs - event.session))
     dir.foreach(Isabelle_System.rm_tree)
   }
 
   def create_scratch(
-    session_id: String,
+    session: PIDE_AI_Session,
     name_suffix: Option[String],
     extension: String
-  ): (Path, Boolean) = {
+  ): (Path, Boolean) = scratch_dirs.synchronized {
     val suffix = name_suffix.getOrElse(Date.now().format(Date.Format("yyyy_MM_dd_HH_mm_ss_SSS")))
     val base_name = scratch_prefix + suffix
     val file_name = base_name + extension
-    val file_path = (File.path(get_scratch_dir(session_id)) + Path.basic(file_name)).canonical
+    val file_path = (File.path(get_scratch_dir(session)) + Path.basic(file_name)).canonical
     (file_path, file_path.file.createNewFile())
   }
 
@@ -64,7 +69,7 @@ class Create_Scratch_Tool extends PIDE_AI_Tool("create_scratch") {
       val session = PIDE_AI_Tool_Util.running_session_param(server.sessions, args)
       val name_suffix = name_suffix_arg.get(args)
       val extension = extension_arg.get(args)
-      val (path, created) = create_scratch(session.id, name_suffix, extension)
+      val (path, created) = create_scratch(session, name_suffix, extension)
       JSON_Object("path" -> PIDE_AI_Util.print_path(path, context.cwd)) ++
       JSON_Object.if_proper(!created, JSON_Object("note" -> "File already existed."))
     }

@@ -9,7 +9,9 @@ New in this PIDE AI version
 New in PIDE AI 2026
 ----------------------------
 
-
+* Tool arguments and outputs now consistently take milliseconds. INCOMPATIBILITY.
+* Show slow commands in `get_state`.
+* `get_session_state` can now show bad positions and slow commands.
 * "origin" is consistently renamed to "node". INCOMPATIBILITY.
 * Tool `find_entities` is renamed to `ranged_origins`. INCOMPATIBILITY.
 * New tools `export` and `build_document`.
