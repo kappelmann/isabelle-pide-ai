@@ -47,7 +47,8 @@ To interactively explore the agent's changes, you may also run an Isabelle/jEdit
     This is done in order to save tokens when agents read and edit files directly.
     Use options `pide_ai_unicode_symbols_disk` and `pide_ai_unicode_symbols` to change the defaults.
     Note that some Isabelle tools, particularly `isabelle build`, require ASCII (e.g. `\<forall>`).
-    The server automatically converts sources to ASCII before builds. Elsewhere, use `isabelle symbols` to recode files and sessions.
+    The server converts sources to ASCII before builds (option `pide_ai_build_encode_symbols`). 
+    Elsewhere, use `isabelle symbols` to recode files and sessions.
 - If you want the agent to see proof states in pre-built base sessions, you have to build them with `-o show_states`. Note that such builds take significantly longer!
 - PIDE AI clients pass a working directory to the server. Paths are read and printed relative to it.
 

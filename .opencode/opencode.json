@@ -4,7 +4,8 @@
     "isabelle-pide-mcp": {
       "type": "local",
       "command": ["/Users/kevin/Programming/isabelle/isabelle/bin/isabelle", "pide_mcp", "-l", "HOL"],
-      "enabled": true
+      "enabled": true,
+      "timeout": 360000000
     }
   }
 }

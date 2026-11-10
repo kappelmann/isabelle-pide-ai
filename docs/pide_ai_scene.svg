@@ -249,7 +249,7 @@ h1 em { font-style: normal; color: var(--red); }
    see saw-spin / flute-run in the generated keyframes */
 .blip { animation: blip 2.4s ease-in-out infinite; }
 @keyframes blip { 0%, 62%, 100% { opacity: 1; } 72%, 86% { opacity: .18; } }
-.eyes { animation: blink 6.5s steps(1) infinite; transform-origin: center; }
+.eyes { animation: blink 6.5s steps(1) infinite; transform-box: fill-box; transform-origin: center; }
 @keyframes blink { 0%, 95%, 100% { transform: scaleY(1); } 96.5%, 98.5% { transform: scaleY(.12); } }
 
 /* one session panel */

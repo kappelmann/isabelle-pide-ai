@@ -18,6 +18,8 @@ object PIDE_AI_Session {
   def unicode_symbols(options: Options): Boolean = options.bool("pide_ai_unicode_symbols")
   def unicode_symbols_disk(options: Options): Boolean =
     options.bool("pide_ai_unicode_symbols_disk")
+  def build_encode_symbols(options: Options): Boolean =
+    options.bool("pide_ai_build_encode_symbols")
   def build_long_running_threshold(options: Options): Time =
     options.seconds("pide_ai_build_long_running_threshold")
   val long_running_threshold_option: String = "pide_ai_long_running_threshold"
@@ -49,10 +51,13 @@ object PIDE_AI_Session {
       progress = new Silent_Progress(progress),
       dirs = spec.dirs, session_ancestor = spec.session_ancestor,
       session_requirements = spec.session_requirements).check_errors
-    val encoded = Symbols.recode_sessions(unicode_symbols = false,
-      session_background.sessions_structure, List(session_background.session_name))
-    if (encoded.nonEmpty) progress.echo("Encoded symbols before build in: " +
-      commas(encoded.map(path => quote(path.implode))))
+    if (build_encode_symbols(options)) {
+      val encoded = Symbols.recode_sessions(unicode_symbols = false,
+        session_background.sessions_structure, List(session_background.session_name),
+        requirements = true, base_logics = List(Isabelle_System.default_logic()))
+      if (encoded.nonEmpty) progress.echo("Encoded symbols before build in: " +
+        commas(encoded.map(path => quote(path.implode))))
+    }
     Build.build(options, selection = Sessions.Selection.session(session_background.session_name),
       build_heap = true, dirs = spec.dirs, infos = session_background.infos,
       fresh_build = spec.fresh_build, no_build = spec.no_build,

@@ -5,7 +5,7 @@ section "Server"
 option pide_ai_exit_on_failed_option_sessions : bool = true for pide_ai
   -- "exit when a session specified in options fails to start"
 
-option pide_ai_await_option_sessions : bool = true for pide_ai
+option pide_ai_await_option_sessions : bool = false for pide_ai
   -- "await sessions specified in options before serving requests"
 
 option pide_ai_log_long_running_threshold : real = 20 for pide_ai
@@ -25,6 +25,9 @@ option pide_ai_unicode_symbols_disk : bool = true for pide_ai
 
 
 section "Sessions"
+
+option pide_ai_build_encode_symbols : bool = true for pide_ai
+  -- "encode symbols before build in the session and its ancestors above the default logic"
 
 option pide_ai_build_long_running_threshold : real = 20 for pide_ai
   -- "threshold for long-running commands of session builds (seconds)"

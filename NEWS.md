@@ -9,6 +9,7 @@ New in this PIDE AI version
 New in PIDE AI 2026
 ----------------------------
 
+* `pide_ai_await_option_sessions` now defaults to false. INCOMPATIBILITY.
 * `pide_ai_unicode_symbols_disk` now defaults to `true`: files are written with Unicode symbols. Use `isabelle symbols` to encode. INCOMPATIBILITY.
 * CLI client now takes arguments as `KEY=STRING` and `KEY:=JSON` besides a JSON object.
 * Command protocol requests now use MCP tools/call format. INCOMPATIBILITY.

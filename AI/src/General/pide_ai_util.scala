@@ -46,12 +46,14 @@ object PIDE_AI_Util {
     for (stop <- end_line if stop < start_line) error(s"end_line $stop < start_line $start_line")
 
   def check_lines(start_line: Int, end_line: Option[Int], total_lines: Int): (Int, Int) = {
+    def check_positive(name: String, line: Int): Unit =
+      if (line < 1) error(s"$name $line out of bounds (lines start at 1)")
     check_ordered_lines(start_line, end_line)
-    if (start_line < 1 || start_line > (total_lines max 1))
+    check_positive("start_line", start_line)
+    if (start_line > (total_lines max 1))
       error(s"start_line $start_line out of bounds (file has $total_lines lines)")
-    for (stop <- end_line if stop < 1 || stop > total_lines)
-      error(s"end_line $stop out of bounds (file has $total_lines lines)")
-    (start_line, end_line.getOrElse(total_lines))
+    end_line.foreach(check_positive("end_line", _))
+    (start_line, end_line.fold(total_lines)(_ min total_lines))
   }
 
   def check_text_range(doc: Line.Document, start_line: Int, end_line: Option[Int]): Text.Range = {
