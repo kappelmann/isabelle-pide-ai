@@ -33,29 +33,30 @@ object PIDE_AI_Dependencies {
   }
 
   def disk_dependencies(
-    session: PIDE_AI_Headless.Session,
+    resources: Resources,
+    conditions: Thy_Conditions.Context,
     names: List[Document.Node.Name],
     progress: PIDE_AI_Progress
   ): List[Document.Node.Name] = {
-    val deps = session.resources.dependencies(session.conditions,
+    val deps = resources.dependencies(conditions,
       names.filter(_.is_theory).map((_, Position.none)), progress = progress)
     val files = try deps.loaded_files catch { case ERROR(_) => Nil }
     (names ::: deps.theories ::: files).distinct
   }
 
   def unloaded_dependencies(
-    session: PIDE_AI_Headless.Session,
+    resources: PIDE_AI_Resources,
+    conditions: Thy_Conditions.Context,
     nodes: Document.Nodes,
     node_names: List[Document.Node.Name],
     exclude: Set[Document.Node.Name],
     progress: PIDE_AI_Progress
   ): List[Document.Node.Name] = {
-    val resources = session.resources
     def is_unloaded(name: Document.Node.Name): Boolean =
-      !exclude(name) && !PIDE_AI_Nodes.is_base_session_theory(resources, name) &&
-      !PIDE_AI_Nodes.is_loaded_dynamic(nodes(name)) && PIDE_AI_Nodes.is_loadable(resources, name)
+      !exclude(name) && !resources.loaded_theory(name) &&
+      !PIDE_AI_Nodes.is_loaded_dynamic(nodes(name)) && resources.is_loadable(name)
     val unloaded = known_dependencies(resources, nodes, node_names).filter(is_unloaded)
-    disk_dependencies(session, unloaded, progress).filter(is_unloaded)
+    disk_dependencies(resources, conditions, unloaded, progress).filter(is_unloaded)
   }
 
   def loaded_descendants(

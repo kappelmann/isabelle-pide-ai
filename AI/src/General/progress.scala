@@ -25,8 +25,7 @@ object PIDE_AI_Progress {
         case Some(result) => result
         case None =>
           val now = Time.now()
-          val limit1 =
-            if (now < limit) limit
+          val limit1 = if (now < limit) limit
             else {
               progress.echo_json(message(now - start))
               now + progress_delay

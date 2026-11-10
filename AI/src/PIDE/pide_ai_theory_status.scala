@@ -16,7 +16,7 @@ object PIDE_AI_Theory_Status {
     var total = 0
     val counts = mutable.Map[PIDE_AI_Command_Status, Int]().withDefaultValue(0)
     for (cmd <- node.commands.iterator) {
-      val status = snapshot.state.command_status(snapshot.version, cmd)
+      val status = PIDE_AI_Command_Status.command_status(snapshot, cmd)
       theory_status = Document_Status.Theory_Status.merge(theory_status, status.theory_status)
       if (!PIDE_AI_Document_Command.is_ignorable(snapshot, cmd)) {
         total += 1
@@ -28,18 +28,15 @@ object PIDE_AI_Theory_Status {
       if (b == 0) 0 else ((a.toDouble / b) * 100).toInt
 
     val consolidated = Document_Status.Theory_Status.consolidated(theory_status)
-    val percentage =
-      node.get_theory match {
-        case None =>
-          if (consolidated) 100
-          else percent(total - counts(PIDE_AI_Command_Status.unprocessed), total).min(99)
-        case Some(command) =>
-          val processed =
-            snapshot.state.command_status(snapshot.version, command).timings.count_finished
-          percent(processed, command.span.theory_commands)
-      }
-    val overall_status =
-      if (!consolidated) Document_Status.Overall_Status.pending
+    val percentage = node.get_theory match {
+      case None => if (consolidated) 100
+        else percent(total - counts(PIDE_AI_Command_Status.unprocessed), total).min(99)
+      case Some(command) =>
+        val processed =
+          PIDE_AI_Command_Status.command_status(snapshot, command).timings.count_finished
+        percent(processed, command.span.theory_commands)
+    }
+    val overall_status = if (!consolidated) Document_Status.Overall_Status.pending
       else if (counts(PIDE_AI_Command_Status.failed) == 0)
         Document_Status.Overall_Status.ok
       else Document_Status.Overall_Status.failed
@@ -58,9 +55,8 @@ object PIDE_AI_Theory_Status {
     def thys_key(overall_status: Document_Status.Overall_Status): String = "thys_" + overall_status
 
     def json(
-      resources: Resources,
+      resources: PIDE_AI_Resources,
       statuses: List[PIDE_AI_Theory_Status],
-      unicode_symbols: Boolean,
       cwd: Option[Path]
     ): JSON.Object.T = {
       val by_status = statuses.groupMapReduce(_.overall_status)(_ => 1)(_ + _)
@@ -68,8 +64,8 @@ object PIDE_AI_Theory_Status {
         by_status.get(s).map(thys_key(s) -> _))) ++
       JSON_Object.if_proper(statuses.nonEmpty,
         JSON_Object("thys" -> JSON_Object(statuses.map(status =>
-          PIDE_AI_Origin.print(resources, status.node_name, cwd) ->
-            status.json(unicode_symbols, cwd)))))
+          resources.print_node_name(status.node_name, cwd) ->
+            status.json(resources.unicode_symbols, cwd)))))
     }
   }
 }

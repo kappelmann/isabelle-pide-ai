@@ -10,6 +10,24 @@ import isabelle._
 import isabelle.symbols.Symbols
 
 object PIDE_AI_Util {
+  def exn_content(exn: Throwable): String = Protocol_Message.clean_output(Exn.message(exn))
+
+  def content(body: XML.Body, unicode_symbols: Boolean): String =
+    Symbols.output_decoded(unicode_symbols, Pretty.output_content(true, body))
+
+  def formatted_content(body: XML.Body, unicode_symbols: Boolean): String =
+    content(Pretty.formatted(body), unicode_symbols)
+
+  def xml_json(tree: XML.Tree, unicode_symbols: Boolean): JSON.Object.T =
+    tree match {
+      case XML.Elem(Markup(name, props), body) =>
+        val props_obj =
+          JSON_Object(props.map((a, b) => a -> Symbols.output_decoded(unicode_symbols, b)))
+        val base = JSON_Object("name" -> name, "body" -> body.map(xml_json(_, unicode_symbols)))
+        if (props_obj.isEmpty) base else base + ("props" -> props_obj)
+      case XML.Text(text) => JSON_Object("text" -> Symbols.output_decoded(unicode_symbols, text))
+    }
+
   def log_failure(log: Logger, what: String, result: Exn.Result[?]): Unit =
     result match {
       case Exn.Exn(exn) => Exn.capture { log.error_message(s"$what: ${Exn.print(exn)}") }
@@ -18,7 +36,7 @@ object PIDE_AI_Util {
 
   def handle_internal_error(log: Logger, what: String, exn: Throwable): String = {
     log_failure(log, "Internal error for " + what, Exn.Exn(exn))
-    "Internal error: " + Exn.message(exn)
+    "Internal error: " + exn_content(exn)
   }
 
   def combined_failure(exn: Throwable, more: List[Throwable]): Throwable =
@@ -138,16 +156,4 @@ object PIDE_AI_Util {
   def restrict_ranges(ranges: Iterable[Text.Range], range: Text.Range): List[Text.Range] =
     ranges.iterator.filter(_.overlaps(range)).map(_.restrict(range)).toList
 
-  def elem_body_plain_text(elem: XML.Elem, unicode_symbols: Boolean): String =
-    Symbols.output_decoded(unicode_symbols, Pretty.string_of(elem.body, pure = true))
-
-  def xml_json(tree: XML.Tree, unicode_symbols: Boolean): JSON.Object.T =
-    tree match {
-      case XML.Elem(Markup(name, props), body) =>
-        val props_obj =
-          JSON_Object(props.map((a, b) => a -> Symbols.output_decoded(unicode_symbols, b)))
-        val base = JSON_Object("name" -> name, "body" -> body.map(xml_json(_, unicode_symbols)))
-        if (props_obj.isEmpty) base else base + ("props" -> props_obj)
-      case XML.Text(text) => JSON_Object("text" -> Symbols.output_decoded(unicode_symbols, text))
-    }
 }

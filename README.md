@@ -75,6 +75,11 @@ To interactively explore the agent's changes, you may also run an Isabelle/jEdit
     ```
     Note that this registers the component by path. If you move this directory later, you hence have to amend the registration.
 
+4. Optionally register the [tool extensions](./Tool_Extensions), which add further tools (e.g. `sledgehammer`, build document output):
+    ```bash
+    isabelle/bin/isabelle components -u <PATH_TO_THIS_DIRECTORY>/Tool_Extensions
+    ```
+
 ## Running the Server
 
 **Note for Windows users:** You have to run below commands through Isabelle's cygwin (`isabelle/contrib/cygwin/bin/bash.exe`).
@@ -220,7 +225,7 @@ or use a different Scala component:
 1. Register the component: `isabelle components -u <PATH_TO_THE_COMPONENT>`.
 1. Include them in the options.
 
-See [Tool\_Extensions](./Tool_Extensions) for such a component with experimental tool extensions.
+See [Tool\_Extensions](./Tool_Extensions) for an example of such a component.
 
 ## Known Limitations/Future Work
 

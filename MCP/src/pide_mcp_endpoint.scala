@@ -91,16 +91,15 @@ class PIDE_MCP_Endpoint(
       (tool, tool_call)
     } match {
       case Exn.Exn(exn) => respond_error(id, JSON_RPC.Error_Code.INVALID_PARAMS, Exn.message(exn))
-      case Exn.Res((tool, tool_call)) =>
-        tool_calls += id -> start_tool_call(tool, tool_call,
-          (token, serial, message) => events.send(Event.Tool_Progress(id, token, serial, message)),
-          result => events.send(Event.Tool_Result(id, result)))
+      case Exn.Res((tool, tool_call)) => tool_calls += id -> start_tool_call(tool, tool_call,
+        (token, serial, message) => events.send(Event.Tool_Progress(id, token, serial, message)),
+        result => events.send(Event.Tool_Result(id, result)))
     }
 
   private def handle_message(json: JSON.T): Unit =
     Exn.result {
       Exn.result { JSON_RPC.read_message(json) } match {
-        case Exn.Exn(exn) => respond_error(JSON_RPC.id(json).getOrElse(null), 
+        case Exn.Exn(exn) => respond_error(JSON_RPC.id(json).getOrElse(null),
           JSON_RPC.Error_Code.INVALID_REQUEST, "Bad request: " + Exn.message(exn))
         case Exn.Res(JSON_RPC.Message.Notification(method, params)) =>
           if (method == MCP.Method.notifications_cancelled) handle_cancelled(params)
@@ -108,15 +107,14 @@ class PIDE_MCP_Endpoint(
         case Exn.Res(JSON_RPC.Message.Request(id, _, _)) if tool_calls.contains(id) =>
           respond_error(id, JSON_RPC.Error_Code.INVALID_REQUEST,
             s"Request id ${JSON.Format(id)} is already active")
-        case Exn.Res(JSON_RPC.Message.Request(id, method, params)) =>
-          method match {
-            case MCP.Method.initialize => handle_initialize(id, params)
-            case MCP.Method.ping => respond(JSON_RPC.result(id, JSON.Object.empty))
-            case MCP.Method.tools_list => handle_tools_list(id)
-            case MCP.Method.tools_call => handle_tool_call(id, params)
-            case _ => respond_error(id, JSON_RPC.Error_Code.METHOD_NOT_FOUND,
-              s"Method not found: ${quote(method)}")
-          }
+        case Exn.Res(JSON_RPC.Message.Request(id, method, params)) => method match {
+          case MCP.Method.initialize => handle_initialize(id, params)
+          case MCP.Method.ping => respond(JSON_RPC.result(id, JSON.Object.empty))
+          case MCP.Method.tools_list => handle_tools_list(id)
+          case MCP.Method.tools_call => handle_tool_call(id, params)
+          case _ => respond_error(id, JSON_RPC.Error_Code.METHOD_NOT_FOUND,
+            s"Method not found: ${quote(method)}")
+        }
       }
     } match {
       case Exn.Res(_) =>

@@ -100,21 +100,21 @@ object PIDE_AI_Session_State {
 
   def json(
     session: PIDE_AI_Session,
-    origins: Option[List[String]],
+    nodes: Option[List[String]],
     show: Show,
     long_running_threshold: Time,
     cwd: Option[Path]
   ): JSON.Object.T = {
     lazy val snapshot = session.snapshot()
     lazy val theories = PIDE_AI_Nodes.Loaded(session.resources, snapshot.version.nodes)
-    lazy val dynamic_thys = origins match {
+    lazy val dynamic_thys = nodes match {
       case None => theories.dynamic
-      case Some(origins) =>
-        val selected = origins.map(session.node_name(_, cwd)).toSet
+      case Some(nodes) =>
+        val selected = nodes.map(session.resources.node_name(_, cwd)).toSet
         theories.dynamic.filter(selected.contains)
     }
-    def print_origins(names: List[Document.Node.Name]): List[String] =
-      names.map(session.print_origin(_, cwd))
+    def print_nodes(names: List[Document.Node.Name]): List[String] =
+      names.map(session.resources.print_node_name(_, cwd))
     JSON_Object("session_id" -> session.id, "base_session" -> session.base_session) ++
     JSON.optional(
       PIDE_AI_Document_Command.States.cmds_key(PIDE_AI_Command_Status.running.name) ->
@@ -125,18 +125,17 @@ object PIDE_AI_Session_State {
       }.filter(_.nonEmpty)) ++
     (show.dynamic_thys match {
       case Show.Dynamic_Thys.none => JSON.Object.empty
-      case Show.Dynamic_Thys.names => JSON_Object("thys" -> print_origins(dynamic_thys))
-      case Show.Dynamic_Thys.summary =>
-        PIDE_AI_Theory_Status.Statuses.json(session.resources,
-          PIDE_AI_Theory_Status.Statuses(snapshot, dynamic_thys), session.unicode_symbols, cwd)
+      case Show.Dynamic_Thys.names => JSON_Object("thys" -> print_nodes(dynamic_thys))
+      case Show.Dynamic_Thys.summary => PIDE_AI_Theory_Status.Statuses.json(session.resources,
+        PIDE_AI_Theory_Status.Statuses(snapshot, dynamic_thys), cwd)
     }) ++
     JSON.optional("base_session_thys" ->
-      Option.when(show.base_session_thys)(print_origins(theories.base_session))) ++
+      Option.when(show.base_session_thys)(print_nodes(theories.base_session))) ++
     JSON.optional("session_dirs" -> Option.when(show.session_dirs)(
       session.directories().map(PIDE_AI_Util.print_path(_, cwd)))) ++
-    options_json(show.options, session.options) ++
+    options_json(show.options, session.session_options) ++
     JSON_Object.if_proper(show.statistics, {
-      val statistics = session.runtime_statistics()
+      val statistics = session.recent_runtime_statistics()
       if (statistics.isEmpty) JSON_Object("note" -> "no ML statistics reported yet")
       else ml_stats_json(statistics)
     })

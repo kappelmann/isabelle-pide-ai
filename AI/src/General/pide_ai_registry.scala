@@ -17,8 +17,7 @@ object PIDE_AI_Registry {
     exclude_ids: String
   ): Map[String, A] = {
     val table = entries.foldLeft(Map.empty[String, A]) {
-      case (table, entry) =>
-        if (table.isDefinedAt(id(entry)))
+      case (table, entry) => if (table.isDefinedAt(id(entry)))
           error(s"Duplicate $kind: ${Library.quote(id(entry))}")
         else table + (id(entry) -> entry)
     }
@@ -48,6 +47,9 @@ object PIDE_AI_Registry {
 
     def include_ids(options: Options): String = options.string(include_option)
     def exclude_ids(options: Options): String = options.string(exclude_option)
+
+    def make_table(options: Options): Map[String, A] =
+      make_table(include_ids = include_ids(options), exclude_ids = exclude_ids(options))
 
     def make_table(include_ids: String = all_option, exclude_ids: String = ""): Map[String, A] =
       PIDE_AI_Registry.make_table(kind,

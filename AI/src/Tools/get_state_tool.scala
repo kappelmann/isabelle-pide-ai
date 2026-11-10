@@ -136,13 +136,13 @@ object Get_State_Tool {
   ): JSON.Object.T = {
     val start = Time.now()
     val snapshot0 =
-      PIDE_AI_Tool_Util.require_stable_node_snapshot(session, node_name, progress, cwd)
+      PIDE_AI_Tool_Util.require_stable_synced_node_snapshot(session, node_name, progress, cwd)
     val range = PIDE_AI_Util.check_text_range(
       Line.Document(snapshot0.node.source), start_line, opt_end_line)
     val selection = PIDE_AI_Document_Command.Selection(snapshot0, Some(range))
     val resources = session.resources
     val long_running_threshold = request.long_running_threshold.getOrElse(
-      PIDE_AI_Session.long_running_threshold(session.options))
+      session.long_running_threshold)
 
     def json(
       snapshot: Document.Snapshot,
@@ -152,7 +152,7 @@ object Get_State_Tool {
     ): JSON.Object.T = {
       val nodes = snapshot.version.nodes
       val states_json = PIDE_AI_Document_Command.States.json(states, request.show,
-        Line.Document(snapshot.node.source), long_running_threshold, session.unicode_symbols, cwd)
+        Line.Document(snapshot.node.source), long_running_threshold, resources.unicode_symbols, cwd)
       val unterminated = states.exists(!_.command_status.is_terminated)
       lazy val dynamic_thys = PIDE_AI_Nodes.Loaded(resources, nodes).dynamic
       val thys = PIDE_AI_Nodes.node_theory(nodes, node_name).toList
@@ -161,16 +161,14 @@ object Get_State_Tool {
         PIDE_AI_Theory_Status.Statuses(snapshot, dynamic_thys.filter(names -- thys))
       val ancestors = request.show_ancestor_thys.select(
         statuses(PIDE_AI_Dependencies.known_dependencies(resources, nodes, thys).toSet))
-      val descendants =
-        request.show_descendant_thys.select(statuses(nodes.descendants(thys).toSet))
+      val descendants = request.show_descendant_thys.select(statuses(nodes.descendants(thys).toSet))
       val other_cmds_running =
         if (!request.show_other_cmds_running.show(unterminated)) JSON.Object.empty
         else {
           val cmds = selection.parts.map(_._1).toSet
-          val selections =
-            PIDE_AI_Document_Command.Selection.nodes(session, snapshot, dynamic_thys)
-              .map((node_snapshot, node_selection) =>
-                node_snapshot -> node_selection.filter((cmd, _) => !cmds(cmd)))
+          val selections = PIDE_AI_Document_Command.Selection.nodes(session, snapshot, dynamic_thys)
+            .map((node_snapshot, node_selection) =>
+              node_snapshot -> node_selection.filter((cmd, _) => !cmds(cmd)))
           PIDE_AI_Document_Command.nodes_running_json(resources, selections,
             1, long_running_threshold, cwd)
         }
@@ -178,14 +176,12 @@ object Get_State_Tool {
         PIDE_AI_Document_Command.States.cmds_key("edited_omitted") -> edited),
         Option.when(timed_out)("timed_out" -> true),
         Option.when(blocked.nonEmpty)("blocked_by" -> JSON_Object(blocked.map((name, header) =>
-          PIDE_AI_Origin.print(resources, name, cwd) ->
-            header.errors.map(_.text(session.unicode_symbols, cwd))))),
+          resources.print_node_name(name, cwd) ->
+            header.errors.map(_.text(resources.unicode_symbols, cwd))))),
         Option.when(ancestors.nonEmpty)(
-          "ancestors" -> PIDE_AI_Theory_Status.Statuses.json(resources, ancestors,
-            session.unicode_symbols, cwd)),
+          "ancestors" -> PIDE_AI_Theory_Status.Statuses.json(resources, ancestors, cwd)),
         Option.when(descendants.nonEmpty)(
-          "descendants" -> PIDE_AI_Theory_Status.Statuses.json(resources, descendants,
-            session.unicode_symbols, cwd)),
+          "descendants" -> PIDE_AI_Theory_Status.Statuses.json(resources, descendants, cwd)),
         Option.when(other_cmds_running.nonEmpty)(
           other_cmds_running_key -> other_cmds_running))
     }
@@ -193,14 +189,15 @@ object Get_State_Tool {
     if (request.timeout.is_zero)
       json(snapshot0, PIDE_AI_Document_Command.States(snapshot0, selection).toList, 0, false)
     else {
-      val (snapshot, states, edited, timed_out) =
-        PIDE_AI_Document_Command.await_states(session, snapshot0, selection,
-          (snapshot, statuses) => request.stop_on.stop(statuses) ||
-            PIDE_AI_Nodes.blocked_by(resources, snapshot.switch(node_name)).nonEmpty,
-          Some((request.timeout - (Time.now() - start)) max Time.zero),
-          get_state_delay(session.options), get_state_check_factor(session.options),
-          (snapshot, states) => json(snapshot, states.toList, 0, false),
-          request.progress_delay.getOrElse(get_state_progress_delay(session.options)), progress)
+      val (snapshot, states, edited, timed_out) = PIDE_AI_Document_Command.await_states(session,
+        snapshot0, selection,
+        (snapshot, statuses) => request.stop_on.stop(statuses) ||
+          PIDE_AI_Nodes.blocked_by(resources, snapshot.switch(node_name)).nonEmpty,
+        Some((request.timeout - (Time.now() - start)) max Time.zero),
+        get_state_delay(session.session_options), get_state_check_factor(session.session_options),
+        (snapshot, states) => json(snapshot, states.toList, 0, false),
+        request.progress_delay.getOrElse(get_state_progress_delay(session.session_options)),
+        progress)
       json(snapshot, states.toList, edited, timed_out)
     }
   }
@@ -214,7 +211,7 @@ class Get_State_Tool extends PIDE_AI_Tool("get_state") with PIDE_AI_Tool.Read_On
   val timeout_arg = Get_State_Tool.Request.timeout_arg(0)
 
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(
-    List(PIDE_AI_Tool_Schema.running_session_arg, PIDE_AI_Tool_Schema.origin_arg,
+    List(PIDE_AI_Tool_Schema.running_session_arg, PIDE_AI_Tool_Schema.node_arg,
       PIDE_AI_Tool_Schema.start_line_default_arg, PIDE_AI_Tool_Schema.opt_end_line_arg) :::
     Get_State_Tool.Request.args(timeout_arg))
 
@@ -226,7 +223,7 @@ class Get_State_Tool extends PIDE_AI_Tool("get_state") with PIDE_AI_Tool.Read_On
   ): PIDE_AI_Tool_Result =
     PIDE_AI_Tool_Result.result {
       val session = PIDE_AI_Tool_Util.running_session_param(server.sessions, args)
-      val node_name = PIDE_AI_Tool_Util.origin_param(session, args, context.cwd)
+      val node_name = PIDE_AI_Tool_Util.node_param(session, args, context.cwd)
       Get_State_Tool.state(session, node_name,
         PIDE_AI_Tool_Schema.start_line_default_arg.get(args),
         PIDE_AI_Tool_Schema.opt_end_line_arg.get(args),

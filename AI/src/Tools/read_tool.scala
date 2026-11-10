@@ -12,7 +12,7 @@ class Read_Tool extends PIDE_AI_Tool("read") {
     PIDE_AI_Tool_Schema.implicit_reload_file
 
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(
-    List(PIDE_AI_Tool_Schema.running_session_arg, PIDE_AI_Tool_Schema.origin_arg,
+    List(PIDE_AI_Tool_Schema.running_session_arg, PIDE_AI_Tool_Schema.node_arg,
       PIDE_AI_Tool_Schema.start_line_default_arg, PIDE_AI_Tool_Schema.opt_end_line_arg))
 
   def handle(
@@ -23,7 +23,7 @@ class Read_Tool extends PIDE_AI_Tool("read") {
   ): PIDE_AI_Tool_Result =
     PIDE_AI_Tool_Result.result {
       val session = PIDE_AI_Tool_Util.running_session_param(server.sessions, args)
-      val node_name = PIDE_AI_Tool_Util.origin_param(session, args, context.cwd)
+      val node_name = PIDE_AI_Tool_Util.node_param(session, args, context.cwd)
       val start_line = PIDE_AI_Tool_Schema.start_line_default_arg.get(args)
       val opt_end_line = PIDE_AI_Tool_Schema.opt_end_line_arg.get(args)
       PIDE_AI_Util.check_ordered_lines(start_line, opt_end_line)

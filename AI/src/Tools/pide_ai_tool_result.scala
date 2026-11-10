@@ -13,7 +13,7 @@ type PIDE_AI_Tool_Result = Result[JSON.T, JSON.T]
 object PIDE_AI_Tool_Result {
   export Result.{Res, Error}
 
-  def exn_error(exn: Throwable): PIDE_AI_Tool_Result = Result.Error(Exn.message(exn))
+  def exn_error(exn: Throwable): PIDE_AI_Tool_Result = Result.Error(PIDE_AI_Util.exn_content(exn))
 
   def result(body: => JSON.T): PIDE_AI_Tool_Result =
     Exn.result(body) match {

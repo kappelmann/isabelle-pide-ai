@@ -99,9 +99,8 @@ object PIDE_AI_Session_Spec {
     "no_build", "Do not build base session on startup and fail if not prebuilt.",
     JSON_Schema.Format.bool, default_spec.no_build)
 
-  val json_args: List[JSON_Schema.Arg[?]] =
-    List(session_arg, logic_arg, dirs_arg, options_arg, session_ancestor_arg,
-      session_requirements_arg, fresh_build_arg, no_build_arg)
+  val json_args: List[JSON_Schema.Arg[?]] = List(session_arg, logic_arg, dirs_arg, options_arg,
+    session_ancestor_arg, session_requirements_arg, fresh_build_arg, no_build_arg)
 
   def from_json(args: JSON.Object.T, cwd: Option[Path]): PIDE_AI_Session_Spec =
     PIDE_AI_Session_Spec(

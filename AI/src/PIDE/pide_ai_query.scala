@@ -43,38 +43,44 @@ class PIDE_AI_Query(
   private val editor = session.editor(progress)
   private val status = Synchronized(Query_Operation.Status.waiting)
   private val output = Synchronized(Editor.Output.init)
-  private val query = new Query_Operation(editor, context, operation,
+  private val query: Query_Operation = new Query_Operation(editor, context, operation,
     st => { status.change(_ => st); progress.echo(s"$operation $st") },
     out =>
-      for (msg <- output.change_result(old => (out.messages.diff(old.messages), out))) {
-        val text = PIDE_AI_Util.elem_body_plain_text(msg, session.unicode_symbols)
-        if (Protocol.is_error(msg)) progress.echo_error_message(text)
-        else if (Protocol.is_warning_or_legacy(msg)) progress.echo_warning(text)
-        else progress.echo(text)
+      for {
+        msg <- output.change_result(old => (out.messages.diff(old.messages), out))
+        kind <- PIDE_AI_Message.Kind.of(msg)
+      } {
+        val text = PIDE_AI_Message(kind, msg, Nil, out.snapshot, query.get_location)
+          .text(session.resources.unicode_symbols, cwd)
+        kind match {
+          case PIDE_AI_Message.Kind.error => progress.echo_error_message(text)
+          case PIDE_AI_Message.Kind.warning => progress.echo_warning(text)
+          case _ => progress.echo(text)
+        }
       })
 
-  private def origin: String = quote(session.print_origin(context.node_name, cwd))
+  private def node: String = quote(session.resources.print_node_name(context.node_name, cwd))
 
   def finished: Boolean = status.value == Query_Operation.Status.finished
 
   def require_snapshot(): Document.Snapshot =
     editor.current_node_snapshot(context).getOrElse(
-      error(s"No PIDE snapshot available for $origin"))
+      error(s"No PIDE snapshot available for $node"))
 
   private def require_command(): Unit =
     for (command <- query.get_location)
       if (!PIDE_AI_Document_Command.snapshot_contains(require_snapshot(), command))
-        error(s"The command of the $operation query in $origin is gone")
+        error(s"The command of the $operation query in $node is gone")
 
   def run(
     args: List[String],
     timeout: Option[Time] = None,
     stop: Editor.Output => Boolean = _ => false
   ): PIDE_AI_Query.Result = {
-    if (PIDE_AI_Nodes.is_base_session_theory(session.resources, context.node_name))
-      error(s"Cannot query base session theory $origin")
+    if (session.resources.loaded_theory(context.node_name))
+      error(s"Cannot query base session theory $node")
     if (editor.current_command(context, require_snapshot()).isEmpty)
-      error(s"No command at the given position of $origin")
+      error(s"No command at the given position of $node")
 
     val start = Time.now()
     query.activate()
@@ -82,8 +88,7 @@ class PIDE_AI_Query(
       editor.send_wait_dispatcher { query.apply_query(args) }
       val outcome = session.await_while_ready(progress,
         elapsed => "Awaiting " + operation + " " + PIDE_AI_Progress.elapsed_text(elapsed),
-        PIDE_AI_Session.poll_delay(session.options),
-        PIDE_AI_Session.progress_delay(session.options)) {
+        session.poll_delay, session.progress_delay) {
         if (finished) Some(PIDE_AI_Query.Outcome.finished)
         else if (stop(output.value)) Some(PIDE_AI_Query.Outcome.stopped)
         else {

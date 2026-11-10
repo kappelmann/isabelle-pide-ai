@@ -22,7 +22,7 @@ object PIDE_AI_Tool_Schema {
   val running_sessions_arg = JSON_Schema.Arg.optional(
     "session_ids", "Default: all running ones.",
     JSON_Schema.Format.list(JSON_Schema.Format.string))
-  val origin_arg = JSON_Schema.Arg.required("origin",
+  val node_arg = JSON_Schema.Arg.required("node",
     s"Session-qualified theory (e.g. ${quote("HOL.Nat")}) or file path.",
     JSON_Schema.Format.string)
   val start_line_arg = JSON_Schema.Arg.required(

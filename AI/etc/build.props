@@ -8,6 +8,7 @@ sources = \
   src/General/json_object.scala \
   src/General/json_schema.scala \
   src/General/lifecycle_hooks.scala \
+  src/General/pide_ai_file_watcher.scala \
   src/General/pide_ai_registry.scala \
   src/General/pide_ai_util.scala \
   src/General/progress.scala \
@@ -25,18 +26,16 @@ sources = \
   src/Stdio/pide_ai_stdio_connector.scala \
   src/Stdio/stdio_connection.scala \
   src/PIDE/pide_ai_command_status.scala \
-  src/PIDE/pide_ai_definition.scala \
   src/PIDE/pide_ai_dependencies.scala \
   src/PIDE/pide_ai_document_command.scala \
   src/PIDE/pide_ai_document_model.scala \
   src/PIDE/pide_ai_editor.scala \
-  src/PIDE/pide_ai_headless.scala \
-  src/PIDE/pide_ai_file_watcher.scala \
   src/PIDE/pide_ai_markup.scala \
   src/PIDE/pide_ai_message.scala \
   src/PIDE/pide_ai_nodes.scala \
   src/PIDE/pide_ai_origin.scala \
   src/PIDE/pide_ai_query.scala \
+  src/PIDE/pide_ai_resources.scala \
   src/PIDE/pide_ai_session.scala \
   src/PIDE/pide_ai_session_spec.scala \
   src/PIDE/pide_ai_session_state.scala \
@@ -71,11 +70,12 @@ sources = \
   src/Tools/create_scratch_tool.scala \
   src/Tools/edit_get_state_tool.scala \
   src/Tools/edit_tool.scala \
-  src/Tools/find_entities_tool.scala \
+  src/Tools/export_tool.scala \
   src/Tools/get_session_state_tool.scala \
   src/Tools/get_state_tool.scala \
   src/Tools/list_extensions_tool.scala \
   src/Tools/list_sessions_tool.scala \
+  src/Tools/ranged_origins_tool.scala \
   src/Tools/read_tool.scala \
   src/Tools/start_session_tool.scala \
   src/Tools/stop_server_tool.scala \
@@ -89,12 +89,13 @@ services = \
   isabelle.pide.ai.Create_Scratch_Tools \
   isabelle.pide.ai.Edit_Get_State_Tools \
   isabelle.pide.ai.Edit_Tools \
+  isabelle.pide.ai.Export_Tools \
   isabelle.pide.ai.File_Watcher_Services \
-  isabelle.pide.ai.Find_Entities_Tools \
   isabelle.pide.ai.Get_Session_State_Tools \
   isabelle.pide.ai.Get_State_Tools \
   isabelle.pide.ai.List_Extensions_Tools \
   isabelle.pide.ai.List_Sessions_Tools \
+  isabelle.pide.ai.Ranged_Origins_Tools \
   isabelle.pide.ai.Read_Tools \
   isabelle.pide.ai.Start_Session_Tools \
   isabelle.pide.ai.Stop_Session_Tools \

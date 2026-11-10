@@ -43,7 +43,7 @@ class File_Watcher_Service extends PIDE_AI_Service("file_watcher") {
             Exn.message(exn))
         case _ =>
       },
-      File_Watcher_Service.delay(session.options), log)
+      File_Watcher_Service.delay(session.session_options), log)
     watchers.change(_ + (session.id -> (watcher, sync_progress)))
   }
 

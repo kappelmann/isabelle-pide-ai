@@ -12,7 +12,7 @@ object Start_Session_Tool extends PIDE_AI_Tool("start_session") {
     "Builds the base session if needed (may take long). " +
     PIDE_AI_Tool_Schema.session_restart
 
-  def input_schema: JSON.Object.T = 
+  def input_schema: JSON.Object.T =
     JSON_Schema.object_schema(PIDE_AI_Session_Spec.json_args)
 
   def handle(

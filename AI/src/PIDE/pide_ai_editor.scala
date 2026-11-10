@@ -10,11 +10,10 @@ object PIDE_AI_Editor {
   sealed case class Context(node_name: Document.Node.Name, offset: Text.Offset)
 }
 
-class PIDE_AI_Editor(mcp_session: PIDE_AI_Session, progress: PIDE_AI_Progress) extends Editor {
+class PIDE_AI_Editor(val session: PIDE_AI_Session, progress: PIDE_AI_Progress) extends Editor {
   type Context = PIDE_AI_Editor.Context
-  type Session = PIDE_AI_Headless.Session
+  type Session = PIDE_AI_Session
 
-  def session: PIDE_AI_Headless.Session = mcp_session.session
   def flush(): Unit = ()
   def invoke(): Unit = ()
   def revoke(): Unit = ()
@@ -22,20 +21,20 @@ class PIDE_AI_Editor(mcp_session: PIDE_AI_Session, progress: PIDE_AI_Progress) e
   def get_models(): Iterable[Document.Model] = Nil
 
   def current_node(context: Context): Option[Document.Node.Name] = Some(context.node_name)
-  def node_snapshot(name: Document.Node.Name): Document.Snapshot = mcp_session.node_snapshot(name)
+  def node_snapshot(name: Document.Node.Name): Document.Snapshot = session.node_snapshot(name)
   def current_node_snapshot(context: Context): Option[Document.Snapshot] =
     try { Some(node_snapshot(context.node_name)) } catch { case ERROR(_) => None }
   def current_command(context: Context, snapshot: Document.Snapshot): Option[Command] =
     snapshot.current_command(context.node_name, context.offset)
 
-  def output_state(): Boolean = mcp_session.options.bool("editor_output_state")
+  def output_state(): Boolean = session.session_options.bool("editor_output_state")
 
   def node_overlays(name: Document.Node.Name): Document.Node.Overlays =
-    mcp_session.tip_version(progress).nodes(name).perspective.overlays
+    session.tip_version(progress).nodes(name).perspective.overlays
   def insert_overlay(command: Command, fn: String, args: List[String]): Unit =
-    mcp_session.insert_overlay(command, fn, args, progress)
+    session.insert_overlay(command, fn, args, progress)
   def remove_overlay(command: Command, fn: String, args: List[String]): Unit =
-    mcp_session.remove_overlay(command, fn, args, new Unstoppable_Progress(progress))
+    session.remove_overlay(command, fn, args, new Unstoppable_Progress(progress))
 
   def hyperlink_command(
     snapshot: Document.Snapshot,

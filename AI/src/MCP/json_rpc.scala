@@ -36,10 +36,8 @@ object JSON_RPC {
     JSON_Schema.Arg.required("jsonrpc", "", JSON_Schema.Format.enumeration(List(version)))
   val id_arg = JSON_Schema.Arg.optional("id", "", Id.format)
   val method_arg = JSON_Schema.Arg.required("method", "", JSON_Schema.Format.string)
-  val params_arg =
-    JSON_Schema.Arg.default("params", "", JSON_Schema.Format.obj, JSON.Object.empty)
-  val response_id_arg =
-    JSON_Schema.Arg.required("id", "", JSON_Schema.Format.nullable(Id.format))
+  val params_arg = JSON_Schema.Arg.default("params", "", JSON_Schema.Format.obj, JSON.Object.empty)
+  val response_id_arg = JSON_Schema.Arg.required("id", "", JSON_Schema.Format.nullable(Id.format))
   val result_arg = JSON_Schema.Arg.required("result", "", JSON_Schema.Format.obj)
   val error_arg = JSON_Schema.Arg.required("error", "", JSON_Schema.Format.obj)
   val code_arg = JSON_Schema.Arg.required("code", "", JSON_Schema.Format.int())

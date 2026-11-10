@@ -76,18 +76,17 @@ Usage: isabelle symbols [OPTIONS] [FILES ...]
       if (files.isEmpty && sessions.isEmpty) getopts.usage()
 
       val progress = new Console_Progress()
-      val recoded =
-        files.map(Path.explode).filter { path =>
-          if (supports_isabelle_symbols(path)) recode_file(unicode_symbols, path)
-          else {
-            progress.echo_warning("Skipped file not supporting Isabelle symbols " + path)
-            false
-          }
+      val recoded = files.map(Path.explode).filter { path =>
+        if (supports_isabelle_symbols(path)) recode_file(unicode_symbols, path)
+        else {
+          progress.echo_warning("Skipped file not supporting Isabelle symbols " + path)
+          false
+        }
         } :::
         (if (sessions.isEmpty) Nil
          else {
-           recode_sessions(unicode_symbols, Sessions.load_structure(Options.init(), dirs = dirs),
-             sessions, requirements = requirements, base_logics = base_logics)
+         recode_sessions(unicode_symbols, Sessions.load_structure(Options.init(), dirs = dirs),
+           sessions, requirements = requirements, base_logics = base_logics)
          })
       for (path <- recoded) progress.echo("Recoded " + path)
     })

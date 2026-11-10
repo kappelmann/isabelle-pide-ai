@@ -95,6 +95,6 @@ sealed case class PIDE_AI_Message(
     PIDE_AI_Message.sendbacks(List(elem), unicode_symbols)
 
   def text(unicode_symbols: Boolean, cwd: Option[Path]): String =
-    PIDE_AI_Util.elem_body_plain_text(
-      cmd.fold(elem)(PIDE_AI_Message.output_message(snapshot, _, elem, cwd)), unicode_symbols)
+    PIDE_AI_Util.formatted_content(
+      cmd.fold(elem)(PIDE_AI_Message.output_message(snapshot, _, elem, cwd)).body, unicode_symbols)
 }

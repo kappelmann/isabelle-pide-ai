@@ -49,14 +49,14 @@ object PIDE_AI_Markup {
 
     def kind_and_type(at_range: List[Text.Info[XML.Elem]]): Option[(String, String)] =
       at_range.collectFirst { case Text.Info(_, e) if e.name == Markup.ML_TYPING =>
-        (ML_kind, Symbols.output_decoded(unicode_symbols, XML.content(e.body)))
+        (ML_kind, PIDE_AI_Util.formatted_content(e.body, unicode_symbols))
       }.orElse(for {
         kind_elem <- at_range.collectFirst {
           case Text.Info(_, e) if term_kinds.contains(e.name) => e }
         typing_elem <- at_range.collectFirst {
           case Text.Info(_, e) if e.name == Markup.TYPING => e }
       } yield (kind_elem.name,
-        Symbols.output_decoded(unicode_symbols, XML.content(typing_elem.body))))
+        PIDE_AI_Util.formatted_content(typing_elem.body, unicode_symbols)))
 
     select_covering(snapshot, range, elements).flatMap {
       case Text.Info(r, infos @ (info :: _)) if info.range == r => // only keep leaf nodes

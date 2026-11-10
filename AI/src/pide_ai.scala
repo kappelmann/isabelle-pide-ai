@@ -27,23 +27,14 @@ object PIDE_AI {
     val handshake_timeout = PIDE_AI_Protocol_Handshake.timeout(options)
 
     def tcp_connector(server: PIDE_AI_Server, socket: ServerSocket): PIDE_AI_TCP_Connector = {
-      val protocols = PIDE_AI_Protocol.make_table(
-        include_ids = PIDE_AI_Protocol.include_ids(options),
-        exclude_ids = PIDE_AI_Protocol.exclude_ids(options))
+      val protocols = PIDE_AI_Protocol.make_table(options)
       new PIDE_AI_TCP_Connector(server, socket, protocols, handshake_timeout, log, message_log)
     }
 
     def run_server(connectors: PIDE_AI_Server => List[PIDE_AI_Connector[?]]): Unit = {
       val server = new PIDE_AI_Server(options, log, progress,
-        PIDE_AI_Service.make_table(
-          include_ids = PIDE_AI_Service.include_ids(options),
-          exclude_ids = PIDE_AI_Service.exclude_ids(options)),
-        PIDE_AI_Tool.make_table(
-          include_ids = PIDE_AI_Tool.include_ids(options),
-          exclude_ids = PIDE_AI_Tool.exclude_ids(options)),
-        PIDE_AI_Client_Info.make_table(
-          include_ids = PIDE_AI_Client_Info.include_ids(options),
-          exclude_ids = PIDE_AI_Client_Info.exclude_ids(options)),
+        PIDE_AI_Service.make_table(options), PIDE_AI_Tool.make_table(options),
+        PIDE_AI_Client_Info.make_table(options),
         specs)
       server.run(connectors(server))
     }
@@ -55,18 +46,17 @@ object PIDE_AI {
       val scope = new Task_Scope[Task[?]]
 
       def start_session(spec: PIDE_AI_Session_Spec, progress: PIDE_AI_Progress): Unit = {
-        val result =
-          try {
-            using(client_connector.connect(PIDE_AI_Command_Protocol, client_context)) {
-              connection =>
-              val call = Task.close_on_stop(connection, s"server $server", log)(Exn.capture {
-                PIDE_AI_Command_Client.call_tool(connection, Start_Session_Tool.id, spec.json,
-                  progress)
-              })
-              Exn.release(scope.run(call))
-            }
+        val result = try {
+          using(client_connector.connect(PIDE_AI_Command_Protocol, client_context)) {
+            connection =>
+            val call = Task.close_on_stop(connection, s"server $server", log)(Exn.capture {
+              PIDE_AI_Command_Client.call_tool(connection, Start_Session_Tool.id, spec.json,
+                progress)
+            })
+            Exn.release(scope.run(call))
           }
-          catch { case ERROR(message) => PIDE_AI_Tool_Result.Error(message) }
+        }
+        catch { case ERROR(message) => PIDE_AI_Tool_Result.Error(message) }
         result match {
           case Result.Res(_) =>
           case Result.Error(err) =>

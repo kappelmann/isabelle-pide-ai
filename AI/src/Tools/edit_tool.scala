@@ -33,8 +33,9 @@ object Edit_Tool {
     progress: PIDE_AI_Progress,
     cwd: Option[Path]
   ): List[(Int, Int)] = {
-    if (PIDE_AI_Nodes.is_base_session_theory(session.resources, node_name))
-      error(s"Cannot edit base session theory ${quote(session.print_origin(node_name, cwd))}")
+    if (session.resources.loaded_theory(node_name))
+      error("Cannot edit base session theory " +
+        quote(session.resources.print_node_name(node_name, cwd)))
     PIDE_AI_Util.check_ordered_lines(request.start_line, request.end_line)
     session.with_lock(progress) {
       val current_text = session.read_update(
@@ -68,7 +69,7 @@ object Edit_Tool {
         PIDE_AI_Util.range_lines(edited_doc, Text.Range(start, start + new_text.length))
       }
       progress.expose_interrupt()
-      if (changed) session.write_file_content(node_name.path, computed_text)
+      if (changed) session.resources.write_file_content(node_name.path, computed_text)
       val (_, change) = session.read_update(
         List(node_name -> Some(edited_lines.map(_ -> Some(_)))),
         hide_others = true,
@@ -82,7 +83,7 @@ object Edit_Tool {
 
   enum Edited_Ranges { case none, each, bounding_box }
 
-  val base_description ="Edit matching text in a given range."
+  val base_description = "Edit matching text in a given range."
 
   val mode_arg = JSON_Schema.Arg.default("mode", "",
     JSON_Schema.Format.enumeration(Mode.values), Mode.replace)
@@ -99,7 +100,7 @@ object Edit_Tool {
     JSON_Schema.Format.enumeration(Edited_Ranges.values), Edited_Ranges.bounding_box)
 
   val edit_args: List[JSON_Schema.Arg[?]] = List(PIDE_AI_Tool_Schema.running_session_arg,
-    PIDE_AI_Tool_Schema.origin_arg, mode_arg, text_arg,
+    PIDE_AI_Tool_Schema.node_arg, mode_arg, text_arg,
     PIDE_AI_Tool_Schema.start_line_default_arg, PIDE_AI_Tool_Schema.opt_end_line_arg,
     old_text_arg, edit_all_arg, show_edited_ranges_arg)
 
@@ -111,7 +112,7 @@ object Edit_Tool {
     cwd: Option[Path]
   ): (List[(Int, Int)], JSON.Object.T) = {
     def pide_text(arg: JSON_Schema.Arg[String]): String =
-      session.pide_text(node_name.path, Line.normalize(arg.get(args)))
+      session.resources.pide_text(node_name.path, Line.normalize(arg.get(args)))
     val request = Request(mode_arg.get(args), pide_text(text_arg),
       PIDE_AI_Tool_Schema.start_line_default_arg.get(args),
       PIDE_AI_Tool_Schema.opt_end_line_arg.get(args), pide_text(old_text_arg),
@@ -132,7 +133,7 @@ object Edit_Tool {
 
 class Edit_Tool extends PIDE_AI_Tool("edit") with PIDE_AI_Tool.Destructive {
   def description: String =
-    Edit_Tool.base_description +" " + PIDE_AI_Tool_Schema.range_perspective + " " +
+    Edit_Tool.base_description + " " + PIDE_AI_Tool_Schema.range_perspective + " " +
     PIDE_AI_Tool_Schema.no_processing_wait + " " +
     PIDE_AI_Tool_Schema.implicit_reload_file
 
@@ -146,7 +147,7 @@ class Edit_Tool extends PIDE_AI_Tool("edit") with PIDE_AI_Tool.Destructive {
   ): PIDE_AI_Tool_Result =
     PIDE_AI_Tool_Result.result {
       val session = PIDE_AI_Tool_Util.running_session_param(server.sessions, args)
-      val node_name = PIDE_AI_Tool_Util.origin_param(session, args, context.cwd)
+      val node_name = PIDE_AI_Tool_Util.node_param(session, args, context.cwd)
       Edit_Tool.read_update_edit(session, node_name, args, progress, context.cwd)._2
     }
 }

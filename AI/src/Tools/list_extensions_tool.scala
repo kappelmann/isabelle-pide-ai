@@ -46,11 +46,9 @@ object List_Extensions_Tool extends PIDE_AI_Tool("list_extensions") with PIDE_AI
           JSON.optional("description" -> Option.when(show_description)(service.description)) ++
           JSON.optional("inputSchema" -> input_schema)
         }
-      def entries(table: Map[String, PIDE_AI_Service]): List[JSON.T] =
-        table.values.toList.filter(service => names.forall(_(service.id)))
-          .sortBy(_.id).map(entry)
-      JSON_Object("services" -> entries(server.service_table),
-        "tools" -> entries(server.tool_table))
+      def entries(services: List[PIDE_AI_Service]): List[JSON.T] =
+        services.filter(service => names.forall(_(service.id))).map(entry)
+      JSON_Object("services" -> entries(server.services), "tools" -> entries(server.tools))
     }
 }
 

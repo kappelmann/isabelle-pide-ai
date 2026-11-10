@@ -4,6 +4,8 @@ requirements = \
   env:ISABELLE_SCALA_JAR \
   env:ISABELLE_PIDE_AI_JAR
 sources = \
+  src/build_document_tool.scala \
   src/sledgehammer_tool.scala
 services = \
+  isabelle.pide.ai.extensions.Build_Document_Tools \
   isabelle.pide.ai.extensions.Sledgehammer_Tools

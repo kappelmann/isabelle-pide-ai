@@ -15,9 +15,9 @@ with PIDE_AI_Tool.Read_Only {
     "(status, commands being processed,...), resource statistics,... " +
     "Sorrys are not listed."
 
-  val filter_origins_arg = JSON_Schema.Arg.default(
-    "filter_origins",
-    "Session id to theory origins whose information is returned. " +
+  val filter_nodes_arg = JSON_Schema.Arg.default(
+    "filter_nodes",
+    "Session id to theory nodes whose information is returned. " +
     "Default for entry-less session: all dynamic theories.",
     JSON_Schema.Format.dictionary(
       JSON_Schema.Format.list(JSON_Schema.Format.string)),
@@ -45,7 +45,7 @@ with PIDE_AI_Tool.Read_Only {
     JSON_Schema.Format.bool, false)
 
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(
-    List(PIDE_AI_Tool_Schema.running_sessions_arg, filter_origins_arg,
+    List(PIDE_AI_Tool_Schema.running_sessions_arg, filter_nodes_arg,
       show_cmds_running_arg, PIDE_AI_Tool_Schema.long_running_arg,
       show_dynamic_thys_arg, show_base_session_thys_arg,
       show_session_dirs_arg, show_options_arg, show_statistics_arg))
@@ -58,11 +58,11 @@ with PIDE_AI_Tool.Read_Only {
   ): PIDE_AI_Tool_Result =
     PIDE_AI_Tool_Result.result {
       val selected_sessions = PIDE_AI_Tool_Util.running_sessions_param(server.sessions, args)
-      val filter_origins = filter_origins_arg.get(args)
+      val filter_nodes = filter_nodes_arg.get(args)
       val selected_ids = selected_sessions.map(_.id)
-      val unknown = filter_origins.keysIterator.filterNot(selected_ids.toSet).toList
+      val unknown = filter_nodes.keysIterator.filterNot(selected_ids.toSet).toList
       if (unknown.nonEmpty) {
-        error(s"Session(s) ${commas_quote(unknown)} of filter_origins not contained in " +
+        error(s"Session(s) ${commas_quote(unknown)} of filter_nodes not contained in " +
           s"selection ${commas_quote(selected_ids)}.")
       }
       val show = PIDE_AI_Session_State.Show(
@@ -74,8 +74,8 @@ with PIDE_AI_Tool.Read_Only {
         statistics = show_statistics_arg.get(args))
       val long_running_threshold = PIDE_AI_Tool_Schema.long_running_arg.get(args)
       JSON_Object("sessions" -> selected_sessions.map(session =>
-        PIDE_AI_Session_State.json(session, filter_origins.get(session.id), show,
-          long_running_threshold.getOrElse(PIDE_AI_Session.long_running_threshold(session.options)),
+        PIDE_AI_Session_State.json(session, filter_nodes.get(session.id), show,
+          long_running_threshold.getOrElse(session.long_running_threshold),
           context.cwd))) ++
       JSON_Object.if_proper(show.statistics,
         PIDE_AI_Session_State.jvm_stats_json())

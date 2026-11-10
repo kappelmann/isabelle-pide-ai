@@ -35,7 +35,7 @@ class Sledgehammer_Tool extends PIDE_AI_Tool("sledgehammer") with PIDE_AI_Tool.R
     JSON_Schema.Format.int(minimum = Some(1)).map(Time.seconds(_), _.seconds.toInt))
 
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(
-    List(PIDE_AI_Tool_Schema.running_session_arg, PIDE_AI_Tool_Schema.origin_arg,
+    List(PIDE_AI_Tool_Schema.running_session_arg, PIDE_AI_Tool_Schema.node_arg,
       line_arg, prefix_arg, provers_arg, isar_proofs_arg, try0_arg,
       proofs_limit_arg, timeout_arg))
 
@@ -69,23 +69,24 @@ class Sledgehammer_Tool extends PIDE_AI_Tool("sledgehammer") with PIDE_AI_Tool.R
     PIDE_AI_Tool_Result.result {
       val cwd = context.cwd
       val session = PIDE_AI_Tool_Util.running_session_param(server.sessions, args)
-      val node_name = PIDE_AI_Tool_Util.origin_param(session, args, cwd)
+      val node_name = PIDE_AI_Tool_Util.node_param(session, args, cwd)
       val snapshot =
-        PIDE_AI_Tool_Util.require_stable_node_snapshot(session, node_name, progress, cwd)
+        PIDE_AI_Tool_Util.require_stable_synced_node_snapshot(session, node_name, progress, cwd)
       val line = line_arg.get(args)
       val editor_context = PIDE_AI_Editor.Context(node_name,
         caret_offset(snapshot.node.source, line,
-          prefix_arg.get(args).map(session.pide_text(node_name.path, _))))
+          prefix_arg.get(args).map(session.resources.pide_text(node_name.path, _))))
       val provers = provers_arg.get(args).getOrElse(
-        session.options.string("sledgehammer_provers"))
+        session.session_options.string("sledgehammer_provers"))
       val query_args = List(provers,
         Value.Boolean(isar_proofs_arg.get(args)), Value.Boolean(try0_arg.get(args)))
       val proofs_limit = proofs_limit_arg.get(args)
+      val unicode_symbols = session.resources.unicode_symbols
       val result = new PIDE_AI_Query(session, editor_context, "sledgehammer", progress, cwd)
         .run(query_args, timeout_arg.get(args),
-          stop = output => proofs(output, session.unicode_symbols).length >= proofs_limit)
-      result.json(PIDE_AI_Message.Kind.values.toList, session.unicode_symbols, cwd) ++
-      JSON.optional("proofs" -> proper_list(proofs(result.output, session.unicode_symbols)))
+          stop = output => proofs(output, unicode_symbols).length >= proofs_limit)
+      result.json(PIDE_AI_Message.Kind.values.toList, unicode_symbols, cwd) ++
+      JSON.optional("proofs" -> proper_list(proofs(result.output, unicode_symbols)))
     }
 }
 

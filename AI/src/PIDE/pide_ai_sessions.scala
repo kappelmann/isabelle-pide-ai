@@ -150,12 +150,12 @@ class PIDE_AI_Sessions(
             stop()
           case _ =>
         }
-        session.session.phase_changed += consumer
-        consumer.consume(session.session.phase) // session might have stopped already
+        session.phase_changed += consumer
+        consumer.consume(session.phase) // session might have stopped already
         start_progress.expose_interrupt()
         log(s"PIDE session ${quote(id)} started")
         hooks.started(PIDE_AI_Sessions.Session_Event(session, start_progress))
-        if (stopping || !session.session.is_ready) throw stopped_during_startup
+        if (stopping || !session.is_ready) throw stopped_during_startup
         session
       }
       start_result match {
@@ -192,8 +192,7 @@ class PIDE_AI_Sessions(
       else if (entries.contains(session_id))
         error(s"Session id ${quote(session_id)} is already used")
       else {
-        val entry =
-          new Entry(session_id, base_options, spec.copy(id = Some(session_id)), progress)
+        val entry = new Entry(session_id, base_options, spec.copy(id = Some(session_id)), progress)
         val forked = Task.fork("pide_ai_session_" + session_id, entry)
         (entry, entries + (session_id -> (entry, forked)))
       }

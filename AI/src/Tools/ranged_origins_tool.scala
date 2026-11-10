@@ -1,4 +1,4 @@
-/*  Title:      AI/src/Tools/find_entities_tool.scala
+/*  Title:      AI/src/Tools/ranged_origins_tool.scala
     Author:     Kevin Kappelmann
 */
 
@@ -6,7 +6,7 @@ package isabelle.pide.ai
 
 import isabelle._
 
-object Find_Entities_Tool {
+object Ranged_Origins_Tool {
   enum Kind(val markups: List[String], val hint: String = "") {
     case facts extends Kind(
       List(Markup.FACT, Markup.DYNAMIC_FACT, Markup.LITERAL_FACT, Markup.AXIOM))
@@ -30,28 +30,28 @@ object Find_Entities_Tool {
   }
 }
 
-class Find_Entities_Tool extends PIDE_AI_Tool("find_entities") with PIDE_AI_Tool.Read_Only {
+class Ranged_Origins_Tool extends PIDE_AI_Tool("ranged_origins") with PIDE_AI_Tool.Read_Only {
   def description: String =
-    "Find definition locations for entities (theorems, commands,...). " +
+    "Find origins of entities (constants, theorems, commands,...) in range. " +
     PIDE_AI_Tool_Schema.implicit_load_file
 
   val snippet_lines_arg = JSON_Schema.Arg.default(
     "snippet_lines", "Number of source lines shown per hit (0 to omit).",
     JSON_Schema.Format.int(minimum = Some(0)), 3)
   val located_in_arg = JSON_Schema.Arg.optional(
-    "located_in", "Return entities located in these origins. Default: all.",
+    "located_in", "Return entities originating in these nodes. Default: all.",
     JSON_Schema.Format.list(JSON_Schema.Format.string))
   val kinds_arg = JSON_Schema.Arg.default(
     "kinds", "Kinds to return. " +
-    Find_Entities_Tool.Kind.values.filter(_.hint.nonEmpty)
+    Ranged_Origins_Tool.Kind.values.filter(_.hint.nonEmpty)
       .map(kind => kind.name + " = " + kind.hint).mkString("; ") + ".",
     JSON_Schema.Format.list(
-      JSON_Schema.Format.enumeration(Find_Entities_Tool.Kind.values, _.name)),
-    List(Find_Entities_Tool.Kind.facts, Find_Entities_Tool.Kind.constant,
-      Find_Entities_Tool.Kind.type_name, Find_Entities_Tool.Kind.`class`))
+      JSON_Schema.Format.enumeration(Ranged_Origins_Tool.Kind.values, _.name)),
+    List(Ranged_Origins_Tool.Kind.facts, Ranged_Origins_Tool.Kind.constant,
+      Ranged_Origins_Tool.Kind.type_name, Ranged_Origins_Tool.Kind.`class`))
 
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(
-    List(PIDE_AI_Tool_Schema.running_session_arg, PIDE_AI_Tool_Schema.origin_arg,
+    List(PIDE_AI_Tool_Schema.running_session_arg, PIDE_AI_Tool_Schema.node_arg,
       PIDE_AI_Tool_Schema.start_line_arg, PIDE_AI_Tool_Schema.opt_end_line_arg,
       snippet_lines_arg, located_in_arg, kinds_arg))
 
@@ -64,22 +64,21 @@ class Find_Entities_Tool extends PIDE_AI_Tool("find_entities") with PIDE_AI_Tool
     PIDE_AI_Tool_Result.result {
       val cwd = context.cwd
       val session = PIDE_AI_Tool_Util.running_session_param(server.sessions, args)
-      val node_name = PIDE_AI_Tool_Util.origin_param(session, args, cwd)
+      val node_name = PIDE_AI_Tool_Util.node_param(session, args, cwd)
       val snapshot =
-        PIDE_AI_Tool_Util.require_stable_node_snapshot(session, node_name, progress, cwd)
+        PIDE_AI_Tool_Util.require_stable_synced_node_snapshot(session, node_name, progress, cwd)
       val snippet_lines = snippet_lines_arg.get(args)
       val filter_node_names =
-        located_in_arg.get(args).map(_.map(session.node_name(_, cwd)).toSet)
+        located_in_arg.get(args).map(_.map(session.resources.node_name(_, cwd)).toSet)
       val range = PIDE_AI_Util.check_text_range(Line.Document(snapshot.node.source),
         PIDE_AI_Tool_Schema.start_line_arg.get(args),
         PIDE_AI_Tool_Schema.opt_end_line_arg.get(args))
-      val definition_kinds = kinds_arg.get(args).flatMap(_.markups)
-      val definitions = PIDE_AI_Definition.definitions(
-        session, snapshot, Some(range), snippet_lines, definition_kinds, filter_node_names,
-        "The definition entry has not been loaded yet. " +
-        PIDE_AI_Tool_Util.retry_soon_message)
-      PIDE_AI_Definition.definitions_json(session.resources, definitions, cwd)
+      val kinds = kinds_arg.get(args).flatMap(_.markups)
+      val origins = PIDE_AI_Origin.origins(
+        session, snapshot, Some(range), snippet_lines, kinds, filter_node_names,
+        "The origin has not been loaded yet. " + PIDE_AI_Tool_Util.retry_soon_message)
+      PIDE_AI_Origin.origins_json(session.resources, origins, cwd)
     }
 }
 
-class Find_Entities_Tools extends PIDE_AI_Tools(new Find_Entities_Tool)
+class Ranged_Origins_Tools extends PIDE_AI_Tools(new Ranged_Origins_Tool)

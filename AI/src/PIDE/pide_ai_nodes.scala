@@ -7,18 +7,12 @@ package isabelle.pide.ai
 import isabelle._
 
 object PIDE_AI_Nodes {
-  def is_base_session_theory(resources: Resources, name: Document.Node.Name): Boolean =
-    resources.loaded_theory(name)
-
   // a cleaned node remains in version.nodes but with empty source
   def is_loaded_dynamic(node: Document.Node): Boolean =
     node.get_blob match {
       case Some(blob) => blob.source.nonEmpty
       case None => !node.is_empty
     }
-
-  def is_loadable(resources: Resources, name: Document.Node.Name): Boolean =
-    name.path.is_file || resources.make_theory_content(name).isDefined
 
   def loading_command(nodes: Document.Nodes, name: Document.Node.Name): Option[Command] =
     nodes.commands_loading(name).headOption
@@ -54,7 +48,7 @@ object PIDE_AI_Nodes {
       val ordered = nodes.topological_order
       val unordered = nodes.names_iterator.filterNot(ordered.toSet).toList
       val all_nodes = (ordered ::: unordered).filter(_.is_theory)
-      val (base_session, dynamic) = all_nodes.partition(is_base_session_theory(resources, _))
+      val (base_session, dynamic) = all_nodes.partition(resources.loaded_theory)
       Loaded(base_session, dynamic.filter(name => is_loaded_dynamic(nodes(name))))
     }
   }

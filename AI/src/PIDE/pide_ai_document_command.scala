@@ -56,7 +56,7 @@ object PIDE_AI_Document_Command {
       if_proper(!same_file(file), " of " + quote(PIDE_AI_Util.print_file(file, cwd))) + ")"
     body.flatMap {
       case XML.Elem(Markup(Markup.POSITION, Position.Item_Id(id, range)), List(XML.Text(text)))
-      if Symbol.decode(text) == here => if (self_id(snapshot.state, cmd)(id)) Nil
+      if text == here => if (self_id(snapshot.state, cmd)(id)) Nil
         else snapshot.find_command_position(id, range.start)
           .map(pos => XML.Text(" " + line_text(pos.line1, pos.name))).toList
       case XML.Elem(markup @ Markup(Markup.POSITION, props @ Position.Line(line)), _)
@@ -73,12 +73,11 @@ object PIDE_AI_Document_Command {
       PIDE_AI_Nodes.node_command(snapshot.version.nodes, snapshot.node_name) match {
         case Some(cmd) =>
           node_command(cmd, PIDE_AI_Util.restrict_text_range(snapshot.node.source, range))
-        case None =>
-          commands(
-            range.fold(snapshot.node.command_iterator())(snapshot.node.command_iterator(_))
-              .map { (cmd, start) =>
-                cmd -> (PIDE_AI_Util.intersect_range(cmd.range + start, range) - start)
-              }.toList)
+        case None => commands(
+          range.fold(snapshot.node.command_iterator())(snapshot.node.command_iterator(_))
+            .map { (cmd, start) =>
+              cmd -> (PIDE_AI_Util.intersect_range(cmd.range + start, range) - start)
+            }.toList)
       }
 
     def nodes(
@@ -158,13 +157,11 @@ object PIDE_AI_Document_Command {
     lazy val bad: List[Text.Info[XML.Elem]] = PIDE_AI_Markup.bad(snapshot, range)
       .filterNot(info => errors.nonEmpty && XML.content(info.info.body).isEmpty)
     private def bad_json(doc: Line.Document, unicode_symbols: Boolean): List[JSON.Object.T] =
-      bad.map { case Text.Info(r, elem) =>
-        JSON_Object.flatten(
-          proper_string(PIDE_AI_Util.elem_body_plain_text(elem, unicode_symbols))
-            .map("message" -> _),
-          Some("src" ->
-            PIDE_AI_Util.numbered_lines(r.substring(snapshot.node.source),
-              doc.position(r.start).line1)))
+      bad.map { info => JSON_Object.flatten(
+        proper_string(PIDE_AI_Util.formatted_content(info.info.body, unicode_symbols))
+          .map("message" -> _),
+        Some("src" -> PIDE_AI_Util.numbered_lines(info.range.substring(snapshot.node.source),
+          doc.position(info.range.start).line1)))
       }
 
     def json(
@@ -223,8 +220,7 @@ object PIDE_AI_Document_Command {
 
     def apply(snapshot: Document.Snapshot, selection: Selection): Iterator[State] = {
       val states = selection match {
-        case Selection.node_command(cmd, range) =>
-          if (snapshot.node_name.is_theory)
+        case Selection.node_command(cmd, range) => if (snapshot.node_name.is_theory)
             command_spans(snapshot, cmd, Some(range))
           else
             Iterator(State(snapshot, cmd, range, PIDE_AI_Message.Messages(snapshot, cmd, 0, range)))
@@ -301,26 +297,23 @@ object PIDE_AI_Document_Command {
       def reported_messages(state: State): List[PIDE_AI_Message] =
         show.message_kinds.flatMap(state.messages_of)
 
-      val status_counts =
-        states.flatMap(reported_statuses).groupMapReduce(identity)(_ => 1)(_ + _)
-          .withDefaultValue(0)
-      val message_counts =
-        states.flatMap(reported_messages).groupMapReduce(_.kind)(_ => 1)(_ + _)
-          .withDefaultValue(0)
+      val status_counts = states.flatMap(reported_statuses).groupMapReduce(identity)(_ => 1)(_ + _)
+        .withDefaultValue(0)
+      val message_counts = states.flatMap(reported_messages).groupMapReduce(_.kind)(_ => 1)(_ + _)
+        .withDefaultValue(0)
       val running = states.filter(_.status.contains(PIDE_AI_Command_Status.running))
       val terminated = states.count(_.command_status.is_terminated)
 
       val items = {
         val all = states.iterator.flatMap { state =>
           lazy val item = state_item_json(state, doc, show.snippet_lines, long_running_threshold)
-          val status_items =
-            reported_statuses(state).filter(status =>
-              PIDE_AI_Command_Status.problematic(status) &&
-              status.message_kind.forall(state.messages_of(_).isEmpty))
+          val status_items = reported_statuses(state).filter(status =>
+            PIDE_AI_Command_Status.problematic(status) &&
+            status.message_kind.forall(state.messages_of(_).isEmpty))
             .map(status => cmds_key(status.name) -> item)
           val bad_items = state.bad.map(info => Markup.BAD ->
             message_item_json(List(info.range),
-              PIDE_AI_Util.elem_body_plain_text(info.info, unicode_symbols), doc,
+              PIDE_AI_Util.formatted_content(info.info.body, unicode_symbols), doc,
               show.snippet_lines))
           val message_items = reported_messages(state).map(msg =>
             PIDE_AI_Message.Messages.key(msg.kind) ->
@@ -389,7 +382,7 @@ object PIDE_AI_Document_Command {
   }
 
   def nodes_running_json(
-    resources: Resources,
+    resources: PIDE_AI_Resources,
     selections: List[(Document.Snapshot, Selection)],
     snippet_lines: Int,
     long_running_threshold: Time,
@@ -401,7 +394,7 @@ object PIDE_AI_Document_Command {
       States.counted_summary(states.length)(
         States.running_json(states, Line.Document(snapshot.node.source),
           snippet_lines, long_running_threshold))
-        .map(PIDE_AI_Origin.print(resources, snapshot.node_name, cwd) -> _)
+        .map(resources.print_node_name(snapshot.node_name, cwd) -> _)
     })
 
   def await(
