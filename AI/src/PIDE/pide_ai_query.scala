@@ -68,9 +68,16 @@ class PIDE_AI_Query(
       error(s"No PIDE snapshot available for $node"))
 
   private def require_command(): Unit =
-    for (command <- query.get_location)
-      if (!PIDE_AI_Document_Command.snapshot_contains(require_snapshot(), command))
+    for (command <- query.get_location) {
+      val snapshot = require_snapshot()
+      if (!PIDE_AI_Document_Command.snapshot_contains(snapshot, command))
         error(s"The command of the $operation query in $node is gone")
+      val print_function = quote(operation + "_query")
+      for {
+        msg <- snapshot.command_results(command).iterator.map(_._2)
+          .filter(Protocol.is_error).map(XML.content).find(_.contains(print_function))
+      } error("Query error: " + msg)
+    }
 
   def run(
     args: List[String],

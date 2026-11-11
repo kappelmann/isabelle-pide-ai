@@ -36,8 +36,6 @@ with Session_Data_Service[File_Watcher_Service.Data] {
         case exn @ Exn.Interrupt() =>
           if (!progress.stopped) log.error_message(s"${quote(name)} interrupted")
           throw exn
-        case exn: Throwable =>
-          log.warning(s"${quote(name)} failed to synchronize: " + Exn.message(exn))
       }
 
     val watcher = new PIDE_AI_File_Watcher[Document.Node.Name](name, loaded_names, _.path, sync,

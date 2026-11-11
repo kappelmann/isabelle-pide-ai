@@ -9,14 +9,14 @@ import isabelle.pide.ai._
 
 class Sledgehammer_Tool extends PIDE_AI_Tool("sledgehammer") with PIDE_AI_Tool.Read_Only {
   def description: String =
-    "Run sledgehammer on command's goal at the given line without modifying the file. " +
+    "Run sledgehammer at a cursor without file modification. " +
+    "Place cursor at command producing the goal (e.g. lemma, not sorry). " +
     PIDE_AI_Tool_Schema.implicit_load_files
 
   val line_arg = JSON_Schema.Arg.required(
     "line", "", JSON_Schema.Format.int(minimum = Some(1)))
-  val prefix_arg = JSON_Schema.Arg.optional(
-    "prefix",
-    "Prefix of the line. Sledgehammer runs on the command following it. Default: end of line.",
+  val line_prefix_arg = JSON_Schema.Arg.optional(
+    "line_prefix", "Place cursor on its last character. Default: whole line.",
     JSON_Schema.Format.string)
   val provers_arg = JSON_Schema.Arg.optional(
     "provers",
@@ -35,25 +35,21 @@ class Sledgehammer_Tool extends PIDE_AI_Tool("sledgehammer") with PIDE_AI_Tool.R
 
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(
     List(PIDE_AI_Tool_Schema.running_session_arg, PIDE_AI_Tool_Schema.node_arg,
-      line_arg, prefix_arg, provers_arg, isar_proofs_arg, try0_arg,
+      line_arg, line_prefix_arg, provers_arg, isar_proofs_arg, try0_arg,
       proofs_limit_arg, timeout_arg, PIDE_AI_Tool_Schema.disk_sync_arg))
 
   private def caret_offset(
     source: String,
     line: Int,
-    prefix: Option[String]
+    line_prefix: Option[String]
   ): Text.Offset = {
     val doc = Line.Document(source)
     val range = PIDE_AI_Util.check_text_range(doc, line, Some(line))
     val text = range.substring(source).stripLineEnd
-    val caret = prefix match {
-        case None => text.length
-        case Some(p) =>
-          if (!text.startsWith(p))
-            error(s"Line $line does not start with ${quote(p)}. Actual line: ${quote(text)}")
-          p.length
-      }
-    range.start + caret
+    val prefix = line_prefix.getOrElse(text)
+    if (!text.startsWith(prefix))
+      error(s"Line $line does not start with ${quote(prefix)}. Actual line: ${quote(text)}")
+    range.start + ((prefix.length - 1) max 0)
   }
 
   private def proofs(output: Editor.Output, unicode_symbols: Boolean): List[String] =
@@ -75,7 +71,7 @@ class Sledgehammer_Tool extends PIDE_AI_Tool("sledgehammer") with PIDE_AI_Tool.R
       val line = line_arg.get(args)
       val editor_context = PIDE_AI_Editor.Context(node_name,
         caret_offset(snapshot.node.source, line,
-          prefix_arg.get(args).map(session.resources.pide_text(node_name.path, _))))
+          line_prefix_arg.get(args).map(session.resources.pide_text(node_name.path, _))))
       val provers = provers_arg.get(args).getOrElse(
         session.session_options.string("sledgehammer_provers"))
       val query_args = List(provers,

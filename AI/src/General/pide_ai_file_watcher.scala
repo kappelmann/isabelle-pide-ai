@@ -32,6 +32,7 @@ class PIDE_AI_File_Watcher[A](
   log: Logger
 ) {
   private var stamps = Map.empty[A, (JFile, PIDE_AI_File_Watcher.Stamp)]
+  private var failures: Option[Int] = None
 
   private def check(): Unit = {
     val current = (for {
@@ -42,8 +43,19 @@ class PIDE_AI_File_Watcher[A](
     val changes = current.iterator.collect {
       case (a, (_, stamp)) if !stamps.get(a).exists(_._2 == stamp) => a
     }.toList
-    if (changes.nonEmpty) changed(changes)
-    stamps = current
+    if (changes.isEmpty) stamps = current
+    else
+      Exn.capture(changed(changes)) match {
+        case Exn.Res(_) =>
+          failures.foreach(n => log(s"${quote(name)} synchronized again after $n failed attempts"))
+          failures = None
+          stamps = current
+        case Exn.Exn(exn) if Exn.is_interrupt(exn) => throw exn
+        case Exn.Exn(exn) =>
+          if (failures.isEmpty)
+            log.warning(s"${quote(name)} failed to synchronize, retrying: " + Exn.message(exn))
+          failures = Some(failures.fold(1)(_ + 1))
+      }
   }
 
   private val consumer = Consumer_Thread.fork_bulk[Unit](name, daemon = true, log = log,
