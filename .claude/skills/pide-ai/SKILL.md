@@ -20,6 +20,7 @@ Paths are relative to a working directory (MCP: dir at connection, CLI: CWD).
 
 ## Checking state
 - Check your changes: get_state for local information in a file, get_session_state information across theories, edit_get_state to edit and get_state for edited commands.
+- Do not run `isabelle build` for checking. Use PIDE AI's live state.
 - processing means a command has not finished yet, not that it succeeded.
 - A theory status ok means all commands finished without errors. It may still contain sorrys (reported as bad, not as errors), proofs aborted with oops (not reported), and warnings.
 - Errors appear in two forms: error messages and failed commands. A failed command might not have an error message.

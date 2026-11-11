@@ -210,16 +210,18 @@ object PIDE_AI_Document_Command {
       snapshot: Document.Snapshot,
       theory_cmd: Command,
       range: Option[Text.Range]
-    ): Iterator[State] =
-      snapshot.command_spans(PIDE_AI_Util.restrict_text_range(snapshot.node.source, range))
-        .iterator.map { span =>
-          val restricted = PIDE_AI_Util.intersect_range(span.range, range)
+    ): Iterator[State] = {
+      val node_range = PIDE_AI_Util.restrict_text_range(snapshot.node.source, range)
+      proper_list(snapshot.command_spans(node_range).map(_.range)).getOrElse(List(node_range))
+        .iterator.map { span_range =>
+          val restricted = PIDE_AI_Util.intersect_range(span_range, range)
           State(snapshot, theory_cmd, restricted,
             Rendering.text_messages(snapshot, restricted).flatMap(info =>
               PIDE_AI_Message.Kind.of(info.info).map(kind =>
                 PIDE_AI_Message(kind, info.info, List(info.range), snapshot,
                   Some(theory_cmd)))))
         }
+    }
 
     def apply(snapshot: Document.Snapshot, selection: Selection): Iterator[State] = {
       val states = selection match {

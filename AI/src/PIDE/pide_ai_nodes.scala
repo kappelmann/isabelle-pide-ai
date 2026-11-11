@@ -7,8 +7,11 @@ package isabelle.pide.ai
 import isabelle._
 
 object PIDE_AI_Nodes {
+  def blobs_names(node: Document.Node): List[Document.Node.Name] =
+    node.load_commands.flatMap(_.blobs_names)
+
   // a cleaned node remains in version.nodes but with empty source
-  def is_loaded_dynamic(nodes: Document.Nodes, name: Document.Node.Name): Boolean = {
+  def is_loaded(nodes: Document.Nodes, name: Document.Node.Name): Boolean = {
     val node = nodes(name)
     node.get_blob match {
       case Some(blob) => blob.source.nonEmpty || nodes.commands_loading(name).nonEmpty
@@ -34,24 +37,23 @@ object PIDE_AI_Nodes {
         PIDE_AI_Document_Command.Selection.commands(List(cmd -> cmd.range))).nextOption())
 
   def blocked_by(
-    resources: Resources,
+    resources: PIDE_AI_Resources,
     node_snapshot: Document.Snapshot
   ): List[(Document.Node.Name, PIDE_AI_Document_Command.State)] =
     for {
       thy <- node_theory(node_snapshot.version.nodes, node_snapshot.node_name).toList
-      dep <- PIDE_AI_Dependencies.known_dependencies(resources, node_snapshot.version.nodes,
-        List(thy))
+      dep <- resources.known_dependency_closure(node_snapshot.version.nodes, List(thy))
       header <- header_state(node_snapshot.switch(dep))
       if header.command_status.is_failed
     } yield dep -> header
 
   object Loaded {
-    def apply(resources: Resources, nodes: Document.Nodes): Loaded = {
+    def apply(resources: PIDE_AI_Resources, nodes: Document.Nodes): Loaded = {
       val ordered = nodes.topological_order
       val unordered = nodes.names_iterator.filterNot(ordered.toSet).toList
       val all_nodes = (ordered ::: unordered).filter(_.is_theory)
-      val (base_session, dynamic) = all_nodes.partition(resources.loaded_theory)
-      Loaded(base_session, dynamic.filter(is_loaded_dynamic(nodes, _)))
+      val (base_session, dynamic) = all_nodes.partition(resources.is_base_session_theory)
+      Loaded(base_session.distinctBy(_.theory), dynamic.filter(is_loaded(nodes, _)))
     }
   }
 

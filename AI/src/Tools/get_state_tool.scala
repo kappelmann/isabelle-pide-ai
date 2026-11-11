@@ -160,9 +160,9 @@ object Get_State_Tool {
             else PIDE_AI_Theory_Status.Statuses.json(resources, statuses, show, cwd)
         }
       val ancestors = statuses_json(request.show_ancestor_thys,
-        PIDE_AI_Dependencies.known_dependencies(resources, nodes, thys).toSet)
+        resources.known_dependency_closure(nodes, thys).toSet)
       val descendants = statuses_json(request.show_descendant_thys,
-        nodes.descendants(thys).toSet)
+        resources.known_descendant_closure(nodes, thys).toSet)
       val other_cmds_running =
         if (!request.show_other_cmds_running.show(unterminated)) JSON.Object.empty
         else {

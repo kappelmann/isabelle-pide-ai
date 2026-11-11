@@ -207,19 +207,13 @@ class PIDE_AI_Session private(
     switch(snapshot(), node_name)
 
   def switch(
-    snapshot: => Document.Snapshot,
+    snapshot: Document.Snapshot,
     node_name: Document.Node.Name
   ): Document.Snapshot = {
-    if (resources.loaded_theory(node_name))
-      read_theory(node_name.theory, unicode_symbols = resources.unicode_symbols)
-    else {
-      val snapshot1 = snapshot
-      val new_snapshot = (if (resources.loaded_theory(snapshot1.node_name)) this.snapshot()
-        else snapshot1).switch(node_name)
-      if (PIDE_AI_Nodes.is_loaded_dynamic(new_snapshot.version.nodes, node_name)) new_snapshot
-      else error("No PIDE snapshot available for " +
-        quote(resources.print_node_name(node_name, None)))
-    }
+    val new_snapshot = snapshot.switch(node_name)
+    if (PIDE_AI_Nodes.is_loaded(new_snapshot.version.nodes, node_name)) new_snapshot
+    else error("No PIDE snapshot available for " +
+      quote(resources.print_node_name(node_name, None)))
   }
 
   def tip_version(progress: PIDE_AI_Progress): Document.Version = {
@@ -257,7 +251,7 @@ class PIDE_AI_Session private(
       with_lock(progress) {
         val nodes = tip_version(progress).nodes
         val node = nodes(node_name)
-        if (PIDE_AI_Nodes.is_loaded_dynamic(nodes, node_name))
+        if (PIDE_AI_Nodes.is_loaded(nodes, node_name))
           update(List(node_name -> PIDE_AI_Document_Model.node_perspective(node)
             .copy(overlays = change(node.perspective.overlays))))
         else if (require_theory)
@@ -324,7 +318,7 @@ class PIDE_AI_Session private(
     with_lock(progress) {
       val nodes = tip_version(progress).nodes
       read_update(
-        node_names.filter(PIDE_AI_Nodes.is_loaded_dynamic(nodes, _)).map(_ -> None),
+        node_names.filter(PIDE_AI_Nodes.is_loaded(nodes, _)).map(_ -> None),
         hide_others = false, progress = progress)
     }
 
@@ -343,8 +337,8 @@ class PIDE_AI_Session private(
     progress: PIDE_AI_Progress
   ): Document.Change =
     with_lock(progress) {
-      sync_resolve(PIDE_AI_Dependencies.known_dependencies(resources,
-        tip_version(progress).nodes, node_names), progress)
+      sync_resolve(resources.known_dependency_closure(tip_version(progress).nodes, node_names),
+        progress)
     }
 
   def sync_loaded_resolve(
@@ -364,14 +358,10 @@ class PIDE_AI_Session private(
     hide_others: Boolean,
     progress: PIDE_AI_Progress
   ): String = {
-    if (resources.loaded_theory(node_name)) node_snapshot(node_name).node.source
-    else {
-      val (texts, change) =
-        read_update(List(node_name -> Some(visible_lines)), hide_others, progress)
-      if (await_stable_before_resolve) await_stable(change, progress)
-      resolve_dependencies(List(node_name), progress)
-      texts(node_name)
-    }
+    val (texts, change) = read_update(List(node_name -> Some(visible_lines)), hide_others, progress)
+    if (await_stable_before_resolve) await_stable(change, progress)
+    resolve_dependencies(List(node_name), progress)
+    texts(node_name)
   }
 
   def resolve_dependencies(
@@ -379,8 +369,8 @@ class PIDE_AI_Session private(
     progress: PIDE_AI_Progress
   ): Unit = {
     @tailrec def loop(seen: Set[Document.Node.Name], node_names: List[Document.Node.Name]): Unit = {
-      val names = PIDE_AI_Dependencies.unloaded_dependencies(resources, conditions,
-        tip_version(progress).nodes, node_names, seen, progress)
+      val names =
+        resources.nodes_to_load(conditions, tip_version(progress).nodes, node_names, seen, progress)
       if (names.nonEmpty) {
         read_update(names.map(_ -> Some(Nil)), hide_others = false, progress = progress)
         loop(seen ++ names, names)
@@ -394,11 +384,9 @@ class PIDE_AI_Session private(
     progress: PIDE_AI_Progress,
     cwd: Option[Path]
   ): (List[Document.Node.Name], Document.Change) = {
-    for (name <- node_names if resources.loaded_theory(name))
-      error(s"Cannot unload base session theory ${quote(resources.print_node_name(name, cwd))}")
     with_lock(progress) {
       val nodes = tip_version(progress).nodes
-      val unloaded = PIDE_AI_Dependencies.removable_names(resources, nodes, node_names)
+      val unloaded = resources.nodes_to_unload(nodes, node_names)
       for (name <- node_names) {
         val loading = nodes.commands_loading(name).map(_.node_name).filterNot(unloaded.contains)
         if (loading.nonEmpty) {

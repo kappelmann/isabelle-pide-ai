@@ -30,12 +30,8 @@ object Edit_Tool {
     session: PIDE_AI_Session,
     node_name: Document.Node.Name,
     request: Request,
-    progress: PIDE_AI_Progress,
-    cwd: Option[Path]
+    progress: PIDE_AI_Progress
   ): List[(Int, Int)] = {
-    if (session.resources.loaded_theory(node_name))
-      error("Cannot edit base session theory " +
-        quote(session.resources.print_node_name(node_name, cwd)))
     PIDE_AI_Util.check_ordered_lines(request.start_line, request.end_line)
     session.with_lock(progress) {
       val current_text = session.read_update(
@@ -114,8 +110,7 @@ object Edit_Tool {
     session: PIDE_AI_Session,
     node_name: Document.Node.Name,
     args: JSON.Object.T,
-    progress: PIDE_AI_Progress,
-    cwd: Option[Path]
+    progress: PIDE_AI_Progress
   ): (List[(Int, Int)], JSON.Object.T) = {
     def pide_text(arg: JSON_Schema.Arg[String]): String =
       session.resources.pide_text(node_name.path, Line.normalize(arg.get(args)))
@@ -124,7 +119,7 @@ object Edit_Tool {
       PIDE_AI_Tool_Schema.opt_end_line_arg.get(args), pide_text(old_text_arg),
       edit_all_arg.get(args))
     val show_edited_lines = show_edited_lines_arg.get(args)
-    val edited_lines = edit(session, node_name, request, progress, cwd)
+    val edited_lines = edit(session, node_name, request, progress)
     val shown_lines = show_edited_lines match {
       case Edited_Lines.none => None
       case Edited_Lines.bounding_box => PIDE_AI_Util.line_ranges_span(edited_lines)
@@ -155,7 +150,7 @@ class Edit_Tool extends PIDE_AI_Tool("edit") with PIDE_AI_Tool.Destructive {
     PIDE_AI_Tool_Result.result {
       val session = PIDE_AI_Tool_Util.running_session_param(server.sessions, args)
       val node_name = PIDE_AI_Tool_Util.node_param(session, args, context.cwd)
-      Edit_Tool.read_update_edit(session, node_name, args, progress, context.cwd)._2
+      Edit_Tool.read_update_edit(session, node_name, args, progress)._2
     }
 }
 

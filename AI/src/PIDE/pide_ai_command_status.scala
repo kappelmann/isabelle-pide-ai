@@ -7,8 +7,13 @@ package isabelle.pide.ai
 import isabelle._
 
 object PIDE_AI_Command_Status {
+  val base_session_status: Document_Status.Command_Status =
+    Document_Status.Command_Status.make(Date.now(),
+      markups = List(Markup(Markup.RUNNING, Nil), Markup(Markup.FINISHED, Nil)))
+
   def command_status(snapshot: Document.Snapshot, cmd: Command): Document_Status.Command_Status =
-    snapshot.state.command_status(snapshot.version, cmd)
+    if (cmd.span.is_theory) base_session_status
+    else snapshot.state.command_status(snapshot.version, cmd)
 
   // cf. Rendering.overview_color
   def range_command_status(

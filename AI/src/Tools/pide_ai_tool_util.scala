@@ -50,7 +50,7 @@ object PIDE_AI_Tool_Util {
     def node = quote(session.resources.print_node_name(node_name, cwd))
     val snapshot = try { session.node_snapshot(node_name) } catch {
       case ERROR(_) =>
-        if (PIDE_AI_Nodes.is_loaded_dynamic(session.tip_version(progress).nodes, node_name))
+        if (PIDE_AI_Nodes.is_loaded(session.tip_version(progress).nodes, node_name))
           error(s"The node $node is loaded but has not been processed yet. " +
             retry_soon_message)
         else {

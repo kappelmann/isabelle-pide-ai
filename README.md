@@ -240,7 +240,6 @@ See [Tool\_Extensions](./Tool_Extensions) for an example of such a component.
     cf. this [email by Hanno Becker](https://isabelle.zulipchat.com/#narrow/channel/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle.2FREPL/near/581059372).
     This requires changes in the Isabelle distribution sources.
 - Command timings for pre-built sessions are currently returned as 0.
-- Node sources of base session blobs should be loaded from database. They are currently read from disk.
 
 ## Related Work
 
