@@ -9,7 +9,7 @@ import isabelle._
 class Read_Tool extends PIDE_AI_Tool("read") {
   def description: String =
     "Read line-numbered content. " + PIDE_AI_Tool_Schema.range_perspective + " " +
-    PIDE_AI_Tool_Schema.implicit_reload_file
+    PIDE_AI_Tool_Schema.implicit_load_files + " " + PIDE_AI_Tool_Schema.implicit_sync
 
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(
     List(PIDE_AI_Tool_Schema.running_session_arg, PIDE_AI_Tool_Schema.node_arg,

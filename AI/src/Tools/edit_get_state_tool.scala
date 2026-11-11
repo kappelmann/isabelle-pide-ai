@@ -9,9 +9,10 @@ import isabelle._
 class Edit_Get_State_Tool extends PIDE_AI_Tool("edit_get_state") with PIDE_AI_Tool.Destructive {
   def description: String =
     Edit_Tool.base_description + " " + Get_State_Tool.base_description("edited commands") + " " +
-    PIDE_AI_Tool_Schema.range_perspective + " " + PIDE_AI_Tool_Schema.implicit_reload_file
+    PIDE_AI_Tool_Schema.range_perspective + " " + PIDE_AI_Tool_Schema.implicit_load_files + " " +
+    PIDE_AI_Tool_Schema.implicit_sync
 
-  val timeout_arg = Get_State_Tool.Request.timeout_arg(Time.seconds(5))
+  val timeout_arg = Get_State_Tool.Request.timeout_arg(Time.seconds(5), "Edit + sync")
 
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(
     Edit_Tool.edit_args ::: Get_State_Tool.Request.args(timeout_arg))
@@ -23,6 +24,7 @@ class Edit_Get_State_Tool extends PIDE_AI_Tool("edit_get_state") with PIDE_AI_To
     context: PIDE_AI_Client_Context
   ): PIDE_AI_Tool_Result =
     PIDE_AI_Tool_Result.result {
+      val start = Time.now()
       val session = PIDE_AI_Tool_Util.running_session_param(server.sessions, args)
       val node_name = PIDE_AI_Tool_Util.node_param(session, args, context.cwd)
       val request = Get_State_Tool.Request.from_json(args, timeout_arg)
@@ -30,7 +32,7 @@ class Edit_Get_State_Tool extends PIDE_AI_Tool("edit_get_state") with PIDE_AI_To
         Edit_Tool.read_update_edit(session, node_name, args, progress)
       json ++ JSON.optional("state" -> PIDE_AI_Util.line_ranges_span(edited_lines).map {
         case (start_line, end_line) => Get_State_Tool.state(session, node_name, start_line,
-          Some(end_line), request, progress, context.cwd)
+          Some(end_line), request, start, progress, context.cwd)
       })
     }
 }

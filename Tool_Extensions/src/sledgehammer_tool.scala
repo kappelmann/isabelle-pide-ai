@@ -10,7 +10,7 @@ import isabelle.pide.ai._
 class Sledgehammer_Tool extends PIDE_AI_Tool("sledgehammer") with PIDE_AI_Tool.Read_Only {
   def description: String =
     "Run sledgehammer on command's goal at the given line without modifying the file. " +
-    PIDE_AI_Tool_Schema.implicit_load_file
+    PIDE_AI_Tool_Schema.implicit_load_files
 
   val line_arg = JSON_Schema.Arg.required(
     "line", "", JSON_Schema.Format.int(minimum = Some(1)))
@@ -30,13 +30,13 @@ class Sledgehammer_Tool extends PIDE_AI_Tool("sledgehammer") with PIDE_AI_Tool.R
     JSON_Schema.Format.bool, true)
   val proofs_limit_arg = JSON_Schema.Arg.default(
     "proofs_limit", "Distinct proofs to be found.", JSON_Schema.Format.int(minimum = Some(1)), 1)
-  val timeout_arg = JSON_Schema.Arg.optional(
-    "timeout_ms", "Before cancellation.", PIDE_AI_Tool_Schema.ms_format(1))
+  val timeout_arg = JSON_Schema.Arg.optional("timeout_ms",
+    "After sync, before cancellation.", PIDE_AI_Tool_Schema.ms_format(1))
 
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(
     List(PIDE_AI_Tool_Schema.running_session_arg, PIDE_AI_Tool_Schema.node_arg,
       line_arg, prefix_arg, provers_arg, isar_proofs_arg, try0_arg,
-      proofs_limit_arg, timeout_arg))
+      proofs_limit_arg, timeout_arg, PIDE_AI_Tool_Schema.disk_sync_arg))
 
   private def caret_offset(
     source: String,
@@ -70,7 +70,8 @@ class Sledgehammer_Tool extends PIDE_AI_Tool("sledgehammer") with PIDE_AI_Tool.R
       val session = PIDE_AI_Tool_Util.running_session_param(server.sessions, args)
       val node_name = PIDE_AI_Tool_Util.node_param(session, args, cwd)
       val snapshot =
-        PIDE_AI_Tool_Util.require_stable_synced_node_snapshot(session, node_name, progress, cwd)
+        PIDE_AI_Tool_Util.require_stable_synced_node_snapshot(session, node_name,
+          PIDE_AI_Tool_Schema.disk_sync_arg.get(args), progress, cwd)
       val line = line_arg.get(args)
       val editor_context = PIDE_AI_Editor.Context(node_name,
         caret_offset(snapshot.node.source, line,

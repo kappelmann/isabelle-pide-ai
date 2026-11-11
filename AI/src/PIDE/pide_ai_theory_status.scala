@@ -20,7 +20,7 @@ object PIDE_AI_Theory_Status {
     for (cmd <- node.commands.iterator) {
       val status = PIDE_AI_Command_Status.command_status(snapshot, cmd)
       theory_status = Document_Status.Theory_Status.merge(theory_status, status.theory_status)
-      if (!PIDE_AI_Document_Command.is_ignorable(snapshot, cmd)) {
+      if (!PIDE_AI_Document_Command.is_ignorable(snapshot, cmd, status)) {
         total += 1
         timing_ms += status.timings.sum(now).ms
         PIDE_AI_Command_Status.statuses(status).foreach(counts(_) += 1)
@@ -43,8 +43,8 @@ object PIDE_AI_Theory_Status {
       else if (counts(PIDE_AI_Command_Status.failed) == 0)
         Document_Status.Overall_Status.ok
       else Document_Status.Overall_Status.failed
-    val header_errors = PIDE_AI_Nodes.header_state(snapshot.switch(name))
-      .filter(_.command_status.is_failed).toList.flatMap(_.errors)
+    val header_errors =
+      PIDE_AI_Nodes.failed_header_state(snapshot.switch(name)).toList.flatMap(_.errors)
     PIDE_AI_Theory_Status(name, overall_status, timing_ms, percentage, header_errors,
       counts.toMap)
   }

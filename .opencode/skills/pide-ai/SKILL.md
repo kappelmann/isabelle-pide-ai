@@ -14,7 +14,7 @@ Paths are relative to a working directory (MCP: dir at connection, CLI: CWD).
 - Prefer unloading a stuck theory over session restart.
 
 ## Edits and synchronisation
-- file_watcher service synchronises disk edits of loaded files. Most tools synchronise the file they work on immediately.
+- file_watcher service synchronises disk edits of loaded files. Many tools synchronise the file they work on immediately.
 - Edits cancel and re-check the edited and all later commands, also in descendant theories: check beyond the edited range.
 - PIDE AI uses symbols (e.g. ∀ vs. \<forall>) as per options pide_ai_unicode_symbols (server) and pide_ai_unicode_symbols_disk (disk). Tool inputs accept either. Non-PIDE AI tools may require ASCII: recode with `isabelle symbols`.
 

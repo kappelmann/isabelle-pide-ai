@@ -15,6 +15,7 @@ object PIDE_AI_Session {
   def poll_delay(options: Options): Time = options.seconds("pide_ai_poll_delay")
   def consolidate_delay(options: Options): Time = options.seconds("pide_ai_consolidate_delay")
   def prune_delay(options: Options): Time = options.seconds("pide_ai_prune_delay")
+  def output_delay(options: Options): Time = options.seconds("pide_ai_output_delay")
   def range_context(options: Options): Int = options.int("pide_ai_range_context")
   def statistics_limit(options: Options): Int = options.int("pide_ai_session_statistics_limit")
   def build_encode_symbols(options: Options): Boolean =
@@ -130,6 +131,8 @@ class PIDE_AI_Session private(
   override def session_options: Options = resources.options
   override def interactive: Boolean = true
   override def consolidate_delay: Time = PIDE_AI_Session.consolidate_delay(session_options)
+  override def output_delay: Time = PIDE_AI_Session.output_delay(session_options)
+  override def nodes_status_delay: Time = session_options.seconds("editor_output_delay")
   override def prune_delay: Time = PIDE_AI_Session.prune_delay(session_options)
   def poll_delay: Time = PIDE_AI_Session.poll_delay(session_options)
   def progress_delay: Time = PIDE_AI_Session.progress_delay(session_options)
@@ -232,10 +235,12 @@ class PIDE_AI_Session private(
     try { switch(snapshot, node_name).node.source }
     catch { case ERROR(_) => resources.read_file_content(node_name) }
 
-  def update(edits: List[Document.Edit_Text]): Document.Change = {
+  def update(nodes: Document.Nodes, edits: List[Document.Edit_Text]): Document.Change = {
     if (edits.nonEmpty) {
-      val blobs = edits.collect { case (name, Document.Node.Blob(blob)) => name -> blob }
-      update(Document.Blobs(blobs.toMap), edits)
+      val loaded_blobs = nodes.iterator.flatMap { (name, node) =>
+        node.get_blob.filter(_ => PIDE_AI_Nodes.is_loaded(nodes, name)).map(name -> _) }
+      val edited_blobs = edits.collect { case (name, Document.Node.Blob(blob)) => name -> blob }
+      update(Document.Blobs(loaded_blobs.toMap ++ edited_blobs), edits)
     }
     tip_change
   }
@@ -252,7 +257,7 @@ class PIDE_AI_Session private(
         val nodes = tip_version(progress).nodes
         val node = nodes(node_name)
         if (PIDE_AI_Nodes.is_loaded(nodes, node_name))
-          update(List(node_name -> PIDE_AI_Document_Model.node_perspective(node)
+          update(nodes, List(node_name -> PIDE_AI_Document_Model.node_perspective(node)
             .copy(overlays = change(node.perspective.overlays))))
         else if (require_theory)
           error(quote(resources.print_node_name(node_name, None)) +
@@ -306,7 +311,7 @@ class PIDE_AI_Session private(
       }
       val other_edits = if (!hide_others) Nil
         else PIDE_AI_Document_Model.hide_edits(version.nodes, nodes.map(_._1).toSet)
-      (models1, update(other_edits ::: models1.flatMap(_.edits)))
+      (models1, update(version.nodes, other_edits ::: models1.flatMap(_.edits)))
     }
     (models.map(model => model.node_name -> model.text).toMap, change)
   }
@@ -329,16 +334,6 @@ class PIDE_AI_Session private(
     with_lock(progress) {
       sync(node_names, progress)
       resolve_dependencies(node_names, progress)
-      tip_change
-    }
-
-  def sync_dependencies_resolve(
-    node_names: List[Document.Node.Name],
-    progress: PIDE_AI_Progress
-  ): Document.Change =
-    with_lock(progress) {
-      sync_resolve(resources.known_dependency_closure(tip_version(progress).nodes, node_names),
-        progress)
     }
 
   def sync_loaded_resolve(
@@ -367,7 +362,7 @@ class PIDE_AI_Session private(
   def resolve_dependencies(
     node_names: List[Document.Node.Name],
     progress: PIDE_AI_Progress
-  ): Unit = {
+  ): Document.Change = {
     @tailrec def loop(seen: Set[Document.Node.Name], node_names: List[Document.Node.Name]): Unit = {
       val names =
         resources.nodes_to_load(conditions, tip_version(progress).nodes, node_names, seen, progress)
@@ -377,6 +372,7 @@ class PIDE_AI_Session private(
       }
     }
     loop(Set.empty, node_names)
+    tip_change
   }
 
   def unload(
@@ -395,7 +391,7 @@ class PIDE_AI_Session private(
             s"Unload $theories instead.")
         }
       }
-      (unloaded, update(unloaded.flatMap(name =>
+      (unloaded, update(nodes, unloaded.flatMap(name =>
         PIDE_AI_Document_Model.unload_edits(this, name, nodes(name)))))
     }
   }

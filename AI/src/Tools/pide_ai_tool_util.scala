@@ -35,11 +35,25 @@ object PIDE_AI_Tool_Util {
   ): Document.Node.Name =
     session.resources.node_name(PIDE_AI_Tool_Schema.node_arg.get(args), cwd)
 
+  enum Sync { case none, node, node_and_ancestors }
+
   def stable_synced(
     session: PIDE_AI_Session,
     node_names: List[Document.Node.Name],
+    sync: Sync,
     progress: PIDE_AI_Progress
-  ): Unit = session.await_stable(session.sync_dependencies_resolve(node_names, progress), progress)
+  ): Unit = {
+    val change = sync match {
+      case Sync.none => session.resolve_dependencies(node_names, progress)
+      case Sync.node => session.sync_resolve(node_names, progress)
+      case Sync.node_and_ancestors =>
+        session.with_lock(progress) {
+          session.sync_resolve(session.resources.known_dependency_closure(
+            session.tip_version(progress).nodes, node_names), progress)
+        }
+    }
+    session.await_stable(change, progress)
+  }
 
   def require_node_snapshot(
     session: PIDE_AI_Session,
@@ -68,10 +82,11 @@ object PIDE_AI_Tool_Util {
   def require_stable_synced_node_snapshot(
     session: PIDE_AI_Session,
     node_name: Document.Node.Name,
+    sync: Sync,
     progress: PIDE_AI_Progress,
     cwd: Option[Path]
   ): Document.Snapshot = {
-    stable_synced(session, List(node_name), progress)
+    stable_synced(session, List(node_name), sync, progress)
     require_node_snapshot(session, node_name, progress, cwd)
   }
 }

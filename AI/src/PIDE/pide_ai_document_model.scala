@@ -13,10 +13,15 @@ object PIDE_AI_Document_Model {
 
   object Replacement {
     def apply(old_text: String, new_text: String): Replacement = {
-      val prefix = old_text.iterator.zip(new_text.iterator).takeWhile(_ == _).length
-      val (old_rest, new_rest) = (old_text.drop(prefix), new_text.drop(prefix))
-      val suffix = old_rest.reverseIterator.zip(new_rest.reverseIterator).takeWhile(_ == _).length
-      Replacement(prefix, old_rest.dropRight(suffix), new_rest.dropRight(suffix))
+      val length = old_text.length min new_text.length
+      var prefix = 0
+      while (prefix < length && old_text(prefix) == new_text(prefix)) prefix += 1
+      var suffix = 0
+      while (suffix < length - prefix &&
+        old_text(old_text.length - 1 - suffix) == new_text(new_text.length - 1 - suffix))
+        suffix += 1
+      Replacement(prefix, old_text.substring(prefix, old_text.length - suffix).nn,
+        new_text.substring(prefix, new_text.length - suffix).nn)
     }
   }
 
@@ -43,7 +48,7 @@ object PIDE_AI_Document_Model {
     }.toList
 
   def unload_edits(
-    session: Document.Session,
+    session: PIDE_AI_Session,
     node_name: Document.Node.Name,
     node: Document.Node
   ): List[Document.Edit_Text] = {
@@ -54,7 +59,7 @@ object PIDE_AI_Document_Model {
   }
 
   def make(
-    session: Document.Session,
+    session: PIDE_AI_Session,
     node_name: Document.Node.Name,
     node: Document.Node,
     text: String,
@@ -75,7 +80,7 @@ object PIDE_AI_Document_Model {
 }
 
 sealed case class PIDE_AI_Document_Model(
-  session: Document.Session,
+  session: PIDE_AI_Session,
   node_name: Document.Node.Name,
   node: Document.Node,
   text: String,
@@ -107,7 +112,10 @@ sealed case class PIDE_AI_Document_Model(
     else Document.Node.Perspective_Text.empty
 
   def edits: List[Document.Edit_Text] =
-    if (is_stable && node.edit_perspective == node_perspective &&
-        (is_theory || node.get_blob.isDefined)) Nil
+    if (is_stable &&
+        (if (is_theory)
+          session.resources.is_base_session_theory(node_name) ||
+          node.edit_perspective == node_perspective
+        else node.get_blob.isDefined)) Nil
     else node_edits(get_thy(), pending_edits, node_perspective)
 }

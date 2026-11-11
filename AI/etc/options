@@ -41,6 +41,9 @@ option pide_ai_long_running_threshold : real = 4 for pide_ai
 option pide_ai_consolidate_delay : real = 0.2 for pide_ai
   -- "delay to consolidate theories after their commands have finished (seconds)"
 
+option pide_ai_output_delay : real = 0.02 for pide_ai
+  -- "delay to report changed commands (seconds)"
+
 option pide_ai_prune_delay : real = 30 for pide_ai
   -- "delay to prune old document versions (seconds)"
 

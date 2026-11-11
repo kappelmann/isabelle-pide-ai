@@ -33,7 +33,7 @@ object Ranged_Origins_Tool {
 class Ranged_Origins_Tool extends PIDE_AI_Tool("ranged_origins") with PIDE_AI_Tool.Read_Only {
   def description: String =
     "Find origins of entities (constants, theorems, commands,...) in range. " +
-    PIDE_AI_Tool_Schema.implicit_load_file
+    PIDE_AI_Tool_Schema.implicit_load_files
 
   val snippet_lines_arg = JSON_Schema.Arg.default(
     "snippet_lines", "Number of source lines shown per hit (0 to omit).",
@@ -53,7 +53,7 @@ class Ranged_Origins_Tool extends PIDE_AI_Tool("ranged_origins") with PIDE_AI_To
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(
     List(PIDE_AI_Tool_Schema.running_session_arg, PIDE_AI_Tool_Schema.node_arg,
       PIDE_AI_Tool_Schema.start_line_arg, PIDE_AI_Tool_Schema.opt_end_line_arg,
-      snippet_lines_arg, located_in_arg, kinds_arg))
+      snippet_lines_arg, located_in_arg, kinds_arg, PIDE_AI_Tool_Schema.disk_sync_arg))
 
   def handle(
     server: PIDE_AI_Server,
@@ -66,7 +66,8 @@ class Ranged_Origins_Tool extends PIDE_AI_Tool("ranged_origins") with PIDE_AI_To
       val session = PIDE_AI_Tool_Util.running_session_param(server.sessions, args)
       val node_name = PIDE_AI_Tool_Util.node_param(session, args, cwd)
       val snapshot =
-        PIDE_AI_Tool_Util.require_stable_synced_node_snapshot(session, node_name, progress, cwd)
+        PIDE_AI_Tool_Util.require_stable_synced_node_snapshot(session, node_name,
+          PIDE_AI_Tool_Schema.disk_sync_arg.get(args), progress, cwd)
       val snippet_lines = snippet_lines_arg.get(args)
       val filter_node_names =
         located_in_arg.get(args).map(_.map(session.resources.node_name(_, cwd)).toSet)

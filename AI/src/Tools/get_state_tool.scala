@@ -78,8 +78,9 @@ object Get_State_Tool {
       JSON_Schema.Format.enumeration(Show_Other_Cmds_Running.values),
       Show_Other_Cmds_Running.if_range_unterminated)
 
-    def timeout_arg(default: Time) = JSON_Schema.Arg.default(
-      "timeout_ms", "Wait for termination.", PIDE_AI_Tool_Schema.ms_format(0), default)
+    def timeout_arg(default: Time, subtracted: String) = JSON_Schema.Arg.default(
+      "timeout_ms", s"Max. wait. $subtracted time gets subtracted.",
+      PIDE_AI_Tool_Schema.ms_format(0), default)
     val progress_delay_arg = JSON_Schema.Arg.optional("progress_delay_ms",
       s"Between reports. Default: $get_state_progress_delay_option.",
       PIDE_AI_Tool_Schema.ms_format(0))
@@ -88,7 +89,8 @@ object Get_State_Tool {
       List(summary_arg, PIDE_AI_Tool_Schema.long_running_arg, summary_problematic_limit_arg,
         snippet_lines_arg, details_arg, details_problematic_limit_arg,
         details_unproblematic_limit_arg, show_ancestor_thys_arg, show_descendant_thys_arg,
-        show_other_cmds_running_arg, timeout_arg, stop_on_arg, progress_delay_arg)
+        show_other_cmds_running_arg, timeout_arg, stop_on_arg, progress_delay_arg,
+        PIDE_AI_Tool_Schema.disk_sync_arg)
 
     def from_json(args: JSON.Object.T, timeout_arg: JSON_Schema.Arg[Time]): Request = {
       val summary = summary_arg.get(args).toSet
@@ -101,7 +103,8 @@ object Get_State_Tool {
           details_unproblematic_limit_arg.get(args)),
         PIDE_AI_Tool_Schema.long_running_arg.get(args), show_ancestor_thys_arg.get(args),
         show_descendant_thys_arg.get(args), show_other_cmds_running_arg.get(args),
-        timeout_arg.get(args), stop_on_arg.get(args), progress_delay_arg.get(args))
+        timeout_arg.get(args), stop_on_arg.get(args), progress_delay_arg.get(args),
+        PIDE_AI_Tool_Schema.disk_sync_arg.get(args))
     }
   }
 
@@ -113,7 +116,8 @@ object Get_State_Tool {
     show_other_cmds_running: Show_Other_Cmds_Running,
     timeout: Time,
     stop_on: Stop_On,
-    progress_delay: Option[Time])
+    progress_delay: Option[Time],
+    sync: PIDE_AI_Tool_Util.Sync)
 
   def state(
     session: PIDE_AI_Session,
@@ -121,12 +125,12 @@ object Get_State_Tool {
     start_line: Int,
     opt_end_line: Option[Int],
     request: Request,
+    start: Time,
     progress: PIDE_AI_Progress,
     cwd: Option[Path]
   ): JSON.Object.T = {
-    val start = Time.now()
-    val snapshot0 =
-      PIDE_AI_Tool_Util.require_stable_synced_node_snapshot(session, node_name, progress, cwd)
+    val snapshot0 = PIDE_AI_Tool_Util.require_stable_synced_node_snapshot(
+      session, node_name, request.sync, progress, cwd)
     val range = PIDE_AI_Util.check_text_range(
       Line.Document(snapshot0.node.source), start_line, opt_end_line)
     val selection = PIDE_AI_Document_Command.Selection(snapshot0, Some(range))
@@ -205,9 +209,9 @@ object Get_State_Tool {
 class Get_State_Tool extends PIDE_AI_Tool("get_state") with PIDE_AI_Tool.Read_Only {
   def description: String =
     Get_State_Tool.base_description("commands in range") + " " +
-    PIDE_AI_Tool_Schema.implicit_load_file
+    PIDE_AI_Tool_Schema.implicit_load_files
 
-  val timeout_arg = Get_State_Tool.Request.timeout_arg(Time.zero)
+  val timeout_arg = Get_State_Tool.Request.timeout_arg(Time.zero, "Sync")
 
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(
     List(PIDE_AI_Tool_Schema.running_session_arg, PIDE_AI_Tool_Schema.node_arg,
@@ -221,12 +225,13 @@ class Get_State_Tool extends PIDE_AI_Tool("get_state") with PIDE_AI_Tool.Read_On
     context: PIDE_AI_Client_Context
   ): PIDE_AI_Tool_Result =
     PIDE_AI_Tool_Result.result {
+      val start = Time.now()
       val session = PIDE_AI_Tool_Util.running_session_param(server.sessions, args)
       val node_name = PIDE_AI_Tool_Util.node_param(session, args, context.cwd)
       Get_State_Tool.state(session, node_name,
         PIDE_AI_Tool_Schema.start_line_default_arg.get(args),
         PIDE_AI_Tool_Schema.opt_end_line_arg.get(args),
-        Get_State_Tool.Request.from_json(args, timeout_arg), progress, context.cwd)
+        Get_State_Tool.Request.from_json(args, timeout_arg), start, progress, context.cwd)
     }
 }
 

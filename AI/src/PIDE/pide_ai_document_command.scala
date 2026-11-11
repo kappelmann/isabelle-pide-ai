@@ -9,10 +9,16 @@ package isabelle.pide.ai
 import isabelle._
 
 object PIDE_AI_Document_Command {
-  def is_ignorable(snapshot: Document.Snapshot, cmd: Command): Boolean =
+  def is_ignorable(
+    snapshot: Document.Snapshot,
+    cmd: Command,
+    status: => Document_Status.Command_Status
+  ): Boolean =
     cmd.is_ignored &&
-    !PIDE_AI_Command_Status.statuses(snapshot, cmd).exists(PIDE_AI_Command_Status.problematic) &&
+    !PIDE_AI_Command_Status.statuses(status).exists(PIDE_AI_Command_Status.problematic) &&
     snapshot.command_results(cmd).is_empty
+  def is_ignorable(snapshot: Document.Snapshot, cmd: Command): Boolean =
+    is_ignorable(snapshot, cmd, PIDE_AI_Command_Status.command_status(snapshot, cmd))
   def is_ignorable_for_good(snapshot: Document.Snapshot, cmd: Command): Boolean =
     is_ignorable(snapshot, cmd) &&
     PIDE_AI_Command_Status.command_status(snapshot, cmd).is_terminated

@@ -31,9 +31,12 @@ object PIDE_AI_Nodes {
   def header_command(node: Document.Node): Option[Command] =
     node.commands.iterator.find(_.span.name == Thy_Header.THEORY)
 
-  def header_state(node_snapshot: Document.Snapshot): Option[PIDE_AI_Document_Command.State] =
-    header_command(node_snapshot.node).flatMap(cmd =>
-      PIDE_AI_Document_Command.States(node_snapshot,
+  def failed_header_state(
+    node_snapshot: Document.Snapshot
+  ): Option[PIDE_AI_Document_Command.State] =
+    header_command(node_snapshot.node)
+      .filter(PIDE_AI_Command_Status.command_status(node_snapshot, _).is_failed)
+      .flatMap(cmd => PIDE_AI_Document_Command.States(node_snapshot,
         PIDE_AI_Document_Command.Selection.commands(List(cmd -> cmd.range))).nextOption())
 
   def blocked_by(
@@ -43,8 +46,7 @@ object PIDE_AI_Nodes {
     for {
       thy <- node_theory(node_snapshot.version.nodes, node_snapshot.node_name).toList
       dep <- resources.known_dependency_closure(node_snapshot.version.nodes, List(thy))
-      header <- header_state(node_snapshot.switch(dep))
-      if header.command_status.is_failed
+      header <- failed_header_state(node_snapshot.switch(dep))
     } yield dep -> header
 
   object Loaded {

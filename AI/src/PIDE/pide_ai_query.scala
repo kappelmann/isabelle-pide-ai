@@ -10,7 +10,7 @@ object PIDE_AI_Query {
   enum Outcome { case finished, stopped, timeout }
   sealed case class Result(
     outcome: Outcome,
-    elapsed: Time,
+    query_time: Time,
     output: Editor.Output,
     command: Option[Command]
   ) {
@@ -28,7 +28,7 @@ object PIDE_AI_Query {
       cwd: Option[Path]
     ): JSON.Object.T =
       JSON_Object.flatten(
-        List(Some("status" -> outcome.toString), Some("elapsed_ms" -> elapsed.ms)) :::
+        List(Some("status" -> outcome.toString), Some("query_ms" -> query_time.ms)) :::
         PIDE_AI_Message.Messages.json(messages.groupBy(_.kind), kinds, unicode_symbols, cwd))
   }
 }

@@ -137,7 +137,7 @@ class Edit_Tool extends PIDE_AI_Tool("edit") with PIDE_AI_Tool.Destructive {
   def description: String =
     Edit_Tool.base_description + " " + PIDE_AI_Tool_Schema.range_perspective + " " +
     PIDE_AI_Tool_Schema.no_processing_wait + " " +
-    PIDE_AI_Tool_Schema.implicit_reload_file
+    PIDE_AI_Tool_Schema.implicit_load_files + " " + PIDE_AI_Tool_Schema.implicit_sync
 
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(Edit_Tool.edit_args)
 

@@ -9,6 +9,8 @@ New in this PIDE AI version
 New in PIDE AI 2026
 ----------------------------
 
+* New argument `disk_sync` to opt into initial disk synchronisation for tools.
+* `edit_get_state`: edit time now counts against `timeout_ms`.
 * Tool arguments and outputs now consistently take milliseconds. INCOMPATIBILITY.
 * Show slow commands in `get_state`.
 * `get_session_state` can now show bad positions and slow commands.

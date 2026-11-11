@@ -9,8 +9,8 @@ package isabelle.pide.ai
 import isabelle._
 
 object PIDE_AI_Tool_Schema {
-  val implicit_load_file: String = "Loads file if needed."
-  val implicit_reload_file: String = "(Re)loads file."
+  val implicit_load_files: String = "Loads files if needed."
+  val implicit_sync: String = "Syncs from disk."
   val range_perspective: String = "Moves PIDE perspective to range."
   val no_processing_wait: String = "Does not wait for commands to terminate."
 
@@ -29,6 +29,8 @@ object PIDE_AI_Tool_Schema {
     "start_line", "", JSON_Schema.Format.int(minimum = Some(1)), 1)
   val opt_end_line_arg = JSON_Schema.Arg.optional(
     "end_line", "Default: end of file.", JSON_Schema.Format.int(minimum = Some(1)))
+  val disk_sync_arg = JSON_Schema.Arg.default("disk_sync", "Before call.",
+    JSON_Schema.Format.enumeration(PIDE_AI_Tool_Util.Sync.values), PIDE_AI_Tool_Util.Sync.node)
 
   def ms_format(minimum: Int): JSON_Schema.Format[Time] =
     JSON_Schema.Format.int(minimum = Some(minimum)).map(Time.ms(_), _.ms.toInt)
