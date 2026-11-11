@@ -27,7 +27,7 @@ with PIDE_AI_Tool.Read_Only {
     "show_terminated_slow", s"Above ${PIDE_AI_Tool_Schema.long_running_arg.name}.",
     JSON_Schema.Format.bool, false)
   val show_bad_arg = JSON_Schema.Arg.default(
-    "show_bad", "Show bad markup positions. Slow for large theories.",
+    "show_bad", "Show bad markup positions.",
     JSON_Schema.Format.bool, false)
   val show_dynamic_thys_arg = PIDE_AI_Tool_Schema.show_thy_statuses_arg(
     "show_dynamic_thys", PIDE_AI_Theory_Status.Statuses.Show.not_ok)

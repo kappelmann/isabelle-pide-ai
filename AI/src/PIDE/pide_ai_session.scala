@@ -168,12 +168,19 @@ class PIDE_AI_Session private(
 
   def recent_runtime_statistics(): List[Properties.T] = statistics.value.toList
 
+  val node_cache = new PIDE_AI_Node_Cache
+  private val node_cache_consumer = Session.Consumer[Session.Commands_Changed](this.class_name) {
+      changed => node_cache.changed(changed.nodes)
+    }
+  commands_changed += node_cache_consumer
+
   private val overlay_updates = Consumer_Thread.fork[() => Unit](s"pide_ai_overlays_$id",
     { e => e(); true }, daemon = true, log = resources.log)
 
   override def stop(): Process_Result = {
     runtime_statistics -= statistics_consumer
     syslog_messages -= syslog_consumer
+    commands_changed -= node_cache_consumer
     val result = Exn.capture { super.stop() }
     PIDE_AI_Util.release_combined(List(result, Exn.capture { overlay_updates.shutdown() }))
     Exn.release(result)
@@ -391,8 +398,10 @@ class PIDE_AI_Session private(
             s"Unload $theories instead.")
         }
       }
-      (unloaded, update(nodes, unloaded.flatMap(name =>
-        PIDE_AI_Document_Model.unload_edits(this, name, nodes(name)))))
+      update(nodes, unloaded.flatMap(name =>
+        PIDE_AI_Document_Model.unload_edits(this, name, nodes(name))))
+      (unloaded, update(tip_version(progress).nodes, unloaded.filter(_.is_theory).map(
+        _ -> Document.Node.Thy(Resources.Thy.empty))))
     }
   }
 }

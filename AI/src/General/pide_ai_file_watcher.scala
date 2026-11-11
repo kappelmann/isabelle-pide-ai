@@ -13,9 +13,9 @@ import java.nio.file.Files
 import java.nio.file.attribute.BasicFileAttributes
 
 object PIDE_AI_File_Watcher {
-  type Stamp = Option[(Long, Long)]
+  type Stamp = (Long, Long)
 
-  def stamp(file: JFile): Stamp =
+  def stamp(file: JFile): Option[Stamp] =
     try {
       val attrs = Files.readAttributes(file.toPath, classOf[BasicFileAttributes]).nn
       if (attrs.isRegularFile) Some((attrs.lastModifiedTime.nn.toMillis, attrs.size)) else None
@@ -24,7 +24,7 @@ object PIDE_AI_File_Watcher {
 }
 
 class PIDE_AI_File_Watcher[A](
-  id: String,
+  name: String,
   files: () => Iterable[A],
   path: A => Path,
   changed: List[A] => Unit,
@@ -34,24 +34,24 @@ class PIDE_AI_File_Watcher[A](
   private var stamps = Map.empty[A, (JFile, PIDE_AI_File_Watcher.Stamp)]
 
   private def check(): Unit = {
-    val current = files().iterator.map { a =>
-      val file = stamps.get(a).fold(path(a).file)(_._1)
-      a -> (file, PIDE_AI_File_Watcher.stamp(file))
-    }.toMap
+    val current = (for {
+      a <- files().iterator
+      file = stamps.get(a).fold(path(a).file)(_._1)
+      stamp <- PIDE_AI_File_Watcher.stamp(file)
+    } yield a -> (file, stamp)).toMap
     val changes = current.iterator.collect {
-      case (a, (_, stamp @ Some(_))) if stamps.get(a).forall(_._2 != stamp) => a
+      case (a, (_, stamp)) if !stamps.get(a).exists(_._2 == stamp) => a
     }.toList
     if (changes.nonEmpty) changed(changes)
     stamps = current
   }
 
-  private val consumer = Consumer_Thread.fork_bulk[Unit]("pide_ai_file_watcher_" + id,
-    daemon = true, log = log, timeout = Some(delay),
+  private val consumer = Consumer_Thread.fork_bulk[Unit](name, daemon = true, log = log,
+    timeout = Some(delay),
     consume = { _ =>
-      val result = Exn.capture_trace(
-        log.error_message, prefix = s"File watcher ${quote(id)} stopped")(check())
+      val result = Exn.capture_trace(log.error_message, prefix = s"${quote(name)} stopped")(check())
       (Nil, Exn.is_res(result))
     })
 
-  def shutdown(): Unit = consumer.shutdown()
+  def stop(): Unit = consumer.shutdown()
 }

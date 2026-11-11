@@ -54,8 +54,7 @@ object PIDE_AI_Document_Model {
   ): List[Document.Edit_Text] = {
     val model = PIDE_AI_Document_Model(session, node_name, node, "",
       Text.Edit.removes(0, node.source), Text.Perspective.empty)
-    model.node_edits(
-      Resources.Thy.empty, model.pending_edits, Document.Node.Perspective_Text.empty)
+    model.node_edits(node.thy, model.pending_edits, Document.Node.Perspective_Text.empty)
   }
 
   def make(

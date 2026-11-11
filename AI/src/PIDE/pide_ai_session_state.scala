@@ -106,7 +106,8 @@ object PIDE_AI_Session_State {
     long_running_threshold: Time,
     cwd: Option[Path]
   ): JSON.Object.T = {
-    lazy val snapshot = session.snapshot()
+    lazy val view = session.node_cache.view(session.snapshot())
+    lazy val snapshot = view.snapshot
     lazy val theories = PIDE_AI_Nodes.Loaded(session.resources, snapshot.version.nodes)
     lazy val dynamic_thys = nodes match {
       case None => theories.dynamic
@@ -114,8 +115,6 @@ object PIDE_AI_Session_State {
         val selected = nodes.map(session.resources.node_name(_, cwd)).toSet
         theories.dynamic.filter(selected.contains)
     }
-    lazy val selections =
-      PIDE_AI_Document_Command.Selection.nodes(session, snapshot, dynamic_thys)
     def print_nodes(names: List[Document.Node.Name]): List[String] =
       names.map(session.resources.print_node_name(_, cwd))
     def optional_entry(key: String, shown: Boolean)(json: => JSON.Object.T): JSON.Object.T =
@@ -123,14 +122,18 @@ object PIDE_AI_Session_State {
     JSON_Object("session_id" -> session.id, "base_session" -> session.base_session) ++
     optional_entry(PIDE_AI_Document_Command.States.cmds_key(PIDE_AI_Command_Status.running.name),
       show.cmds_running)(PIDE_AI_Document_Command.nodes_running_json(session.resources,
-        selections, 1, long_running_threshold, cwd)) ++
+        PIDE_AI_Document_Command.Selection.running(session, view, dynamic_thys), 1,
+        long_running_threshold, cwd)) ++
     optional_entry(PIDE_AI_Document_Command.States.cmds_key("terminated_slow"),
       show.terminated_slow)(PIDE_AI_Document_Command.nodes_terminated_slow_json(
-        session.resources, selections, 1, long_running_threshold, cwd)) ++
+        session.resources, PIDE_AI_Document_Command.Selection.terminated_slow(session, view,
+          dynamic_thys, long_running_threshold), 1, long_running_threshold, cwd)) ++
     optional_entry(Markup.BAD, show.bad)(
-      PIDE_AI_Document_Command.nodes_bad_json(session.resources, selections, cwd)) ++
+      PIDE_AI_Document_Command.nodes_bad_json(session.resources, view,
+        dynamic_thys.flatMap(thy =>
+          thy :: PIDE_AI_Nodes.blobs_names(snapshot.version.nodes(thy))).distinct, cwd)) ++
     PIDE_AI_Theory_Status.Statuses.json(session.resources,
-      PIDE_AI_Theory_Status.Statuses(snapshot, dynamic_thys), show.dynamic_thys, cwd) ++
+      PIDE_AI_Theory_Status.Statuses(view, dynamic_thys), show.dynamic_thys, cwd) ++
     JSON.optional("base_session_thys" ->
       Option.when(show.base_session_thys)(print_nodes(theories.base_session))) ++
     JSON.optional("session_dirs" -> Option.when(show.session_dirs)(

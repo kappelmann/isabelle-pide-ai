@@ -6,22 +6,36 @@ package isabelle.pide.ai
 
 import isabelle._
 
+object Throttle {
+  sealed case class State[A](
+    latest: Option[A] = None,
+    last: Time = Time.zero,
+    stopped: Boolean = false)
+}
+
 class Throttle[A](delay: Time, log: Logger)(f: A => Unit) {
-  private val state = Synchronized[(Option[A], Time)]((None, Time.zero))
+  private val state = Synchronized(Throttle.State[A]())
 
   private val event = new Delay_Ops(log) {
     override def app(body: => Unit): Unit =
       Isabelle_Thread.fork(name = "pide_ai_throttle") {
         PIDE_AI_Util.log_failure(log, "Throttled event failed", Exn.capture(body))
       }
-  }.first(state.value._2 + delay - Time.now()) {
+  }.first(state.value.last + delay - Time.now()) {
     synchronized {
-      state.change_result { (latest, _) => (latest, (None, Time.now())) }.foreach(f)
+      state.change_result(st => (st.latest, st.copy(latest = None, last = Time.now())))
+        .foreach(f)
     }
   }
 
   def apply(a: A): Unit = {
-    state.change { (_, last) => (Some(a), last) }
-    event.invoke()
+    val accepted = state.change_result(st =>
+      if (st.stopped) (false, st) else (true, st.copy(latest = Some(a))))
+    if (accepted) event.invoke()
+  }
+
+  def stop(): Unit = {
+    state.change(_.copy(latest = None, stopped = true))
+    event.revoke()
   }
 }

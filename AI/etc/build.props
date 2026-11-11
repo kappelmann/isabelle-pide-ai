@@ -31,6 +31,7 @@ sources = \
   src/PIDE/pide_ai_editor.scala \
   src/PIDE/pide_ai_markup.scala \
   src/PIDE/pide_ai_message.scala \
+  src/PIDE/pide_ai_node_cache.scala \
   src/PIDE/pide_ai_nodes.scala \
   src/PIDE/pide_ai_origin.scala \
   src/PIDE/pide_ai_query.scala \
@@ -60,7 +61,9 @@ sources = \
   src/Command/pide_ai_command_endpoint.scala \
   src/Command/pide_ai_command_protocol.scala \
   src/Services/pide_ai_service.scala \
+  src/Services/session_data_service.scala \
   src/Services/file_watcher_service.scala \
+  src/Services/node_cache_service.scala \
   src/Tools/pide_ai_tool.scala \
   src/Tools/pide_ai_tool_result.scala \
   src/Tools/pide_ai_tool_schema.scala \
@@ -94,6 +97,7 @@ services = \
   isabelle.pide.ai.Get_State_Tools \
   isabelle.pide.ai.List_Extensions_Tools \
   isabelle.pide.ai.List_Sessions_Tools \
+  isabelle.pide.ai.Node_Cache_Services \
   isabelle.pide.ai.Ranged_Origins_Tools \
   isabelle.pide.ai.Read_Tools \
   isabelle.pide.ai.Start_Session_Tools \

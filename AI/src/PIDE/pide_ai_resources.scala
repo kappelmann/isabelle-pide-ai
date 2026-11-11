@@ -101,8 +101,8 @@ class PIDE_AI_Resources(
   ): List[Document.Node.Name] = {
     val deps = dependencies(conditions,
       names.filter(_.is_theory).map((_, Position.none)), progress = progress)
-    val files = try deps.loaded_files catch { case ERROR(_) => Nil }
-    (names ::: deps.theories ::: files).distinct
+    val blobs = try deps.loaded_files catch { case ERROR(_) => Nil }
+    (names ::: deps.theories ::: blobs).distinct
   }
 
   def nodes_to_load(

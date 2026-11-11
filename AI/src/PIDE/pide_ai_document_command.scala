@@ -9,26 +9,6 @@ package isabelle.pide.ai
 import isabelle._
 
 object PIDE_AI_Document_Command {
-  def is_ignorable(
-    snapshot: Document.Snapshot,
-    cmd: Command,
-    status: => Document_Status.Command_Status
-  ): Boolean =
-    cmd.is_ignored &&
-    !PIDE_AI_Command_Status.statuses(status).exists(PIDE_AI_Command_Status.problematic) &&
-    snapshot.command_results(cmd).is_empty
-  def is_ignorable(snapshot: Document.Snapshot, cmd: Command): Boolean =
-    is_ignorable(snapshot, cmd, PIDE_AI_Command_Status.command_status(snapshot, cmd))
-  def is_ignorable_for_good(snapshot: Document.Snapshot, cmd: Command): Boolean =
-    is_ignorable(snapshot, cmd) &&
-    PIDE_AI_Command_Status.command_status(snapshot, cmd).is_terminated
-
-  def is_terminated_slow(
-    status: Document_Status.Command_Status,
-    threshold: Time,
-    now: Date
-  ): Boolean = status.is_terminated && status.timings.sum(now) >= threshold
-
   def snapshot_contains(snapshot: Document.Snapshot, cmd: Command): Boolean =
     snapshot.command_node(cmd).commands.contains(cmd)
 
@@ -80,6 +60,35 @@ object PIDE_AI_Document_Command {
     }
   }
 
+  def is_ignorable(
+    snapshot: Document.Snapshot,
+    cmd: Command,
+    status: => Document_Status.Command_Status
+  ): Boolean =
+    cmd.is_ignored &&
+    !PIDE_AI_Command_Status.statuses(status).exists(PIDE_AI_Command_Status.problematic) &&
+    snapshot.command_results(cmd).is_empty
+  def is_ignorable(snapshot: Document.Snapshot, cmd: Command): Boolean =
+    is_ignorable(snapshot, cmd, PIDE_AI_Command_Status.command_status(snapshot, cmd))
+  def is_ignorable_for_good(snapshot: Document.Snapshot, cmd: Command): Boolean =
+    is_ignorable(snapshot, cmd) &&
+    PIDE_AI_Command_Status.command_status(snapshot, cmd).is_terminated
+
+  def is_terminated_slow(
+    status: Document_Status.Command_Status,
+    threshold: Time,
+    now: Date
+  ): Boolean = status.is_terminated && status.timings.sum(now) >= threshold
+
+  val terminated_timings: PIDE_AI_Node_Cache.Data[List[(Command, Time)]] =
+    PIDE_AI_Node_Cache.Data { snapshot =>
+      val now = Date.now()
+      snapshot.node.commands.iterator.flatMap { cmd =>
+        val status = PIDE_AI_Command_Status.command_status(snapshot, cmd)
+        Option.when(status.is_terminated)(cmd -> status.timings.sum(now))
+      }.toList.sortBy(-_._2.ms)
+    }
+
   object Selection {
     def apply(snapshot: Document.Snapshot, range: Option[Text.Range]): Selection =
       PIDE_AI_Nodes.node_command(snapshot.version.nodes, snapshot.node_name) match {
@@ -101,6 +110,26 @@ object PIDE_AI_Document_Command {
         val node_snapshot = session.switch(snapshot, name)
         node_snapshot -> Selection(node_snapshot, None)
       }
+
+    def running(
+      session: PIDE_AI_Session,
+      view: PIDE_AI_Node_Cache.View,
+      names: List[Document.Node.Name]
+    ): List[(Document.Snapshot, Selection)] =
+      nodes(session, view.snapshot, PIDE_AI_Theory_Status.Statuses.running(view, names))
+
+    def terminated_slow(
+      session: PIDE_AI_Session,
+      view: PIDE_AI_Node_Cache.View,
+      names: List[Document.Node.Name],
+      long_running_threshold: Time
+    ): List[(Document.Snapshot, Selection)] = {
+      val slow = names.flatMap(name => proper_list(view(terminated_timings, name)
+        .takeWhile(_._2 >= long_running_threshold).map(_._1)).map(name -> _.toSet))
+      val slow_cmds = slow.toMap
+      nodes(session, view.snapshot, slow.map(_._1)).map((snapshot, selection) =>
+        snapshot -> selection.filter((cmd, _) => slow_cmds(snapshot.node_name)(cmd)))
+    }
   }
 
   enum Selection {
@@ -440,22 +469,27 @@ object PIDE_AI_Document_Command {
     cwd: Option[Path]
   ): JSON.Object.T = {
     val now = Date.now()
-    nodes_states_json(resources, selections, is_terminated_slow(_, long_running_threshold, now),
-      cwd)((snapshot, states) => States.terminated_slow_json(states,
-        Line.Document(snapshot.node.source), snippet_lines, long_running_threshold))
+    nodes_states_json(resources, selections,
+      is_terminated_slow(_, long_running_threshold, now), cwd)((snapshot, states) =>
+        States.terminated_slow_json(states, Line.Document(snapshot.node.source), snippet_lines,
+          long_running_threshold))
   }
+
+  val bad_lines: PIDE_AI_Node_Cache.Data[List[String]] =
+    PIDE_AI_Node_Cache.Data { snapshot =>
+      val doc = Line.Document(snapshot.node.source)
+      PIDE_AI_Markup.bad(snapshot, Text.Range.full).map(info =>
+        PIDE_AI_Util.line_range.tupled(PIDE_AI_Util.range_lines(doc, info.range))).distinct
+    }
 
   def nodes_bad_json(
     resources: PIDE_AI_Resources,
-    selections: List[(Document.Snapshot, Selection)],
+    view: PIDE_AI_Node_Cache.View,
+    names: List[Document.Node.Name],
     cwd: Option[Path]
   ): JSON.Object.T =
-    JSON_Object(selections.flatMap { (snapshot, _) =>
-      val doc = Line.Document(snapshot.node.source)
-      proper_list(PIDE_AI_Markup.bad(snapshot, Text.Range.full).map(info =>
-        PIDE_AI_Util.line_range.tupled(PIDE_AI_Util.range_lines(doc, info.range))).distinct)
-        .map(resources.print_node_name(snapshot.node_name, cwd) -> _)
-    })
+    JSON_Object(names.flatMap(name => proper_list(view(bad_lines, name))
+      .map(resources.print_node_name(name, cwd) -> _)))
 
   def await(
     session: PIDE_AI_Session,

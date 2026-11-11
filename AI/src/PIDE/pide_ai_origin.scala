@@ -35,9 +35,31 @@ object PIDE_AI_Origin {
     filter_node_names: Option[Set[Document.Node.Name]],
     origin_not_loaded: String
   ) {
-    private val cache = mutable.Map.empty[Document.Node.Name, Line.Document]
+    private val docs = mutable.Map.empty[Document.Node.Name, Line.Document]
     def doc(node_name: Document.Node.Name): Line.Document =
-      cache.getOrElseUpdate(node_name, Line.Document(session.node_source(snapshot, node_name)))
+      docs.getOrElseUpdate(node_name, Line.Document(session.node_source(snapshot, node_name)))
+
+    private val snippets = mutable.Map.empty[(Document.Node.Name, Int), String]
+    def snippet(node_name: Document.Node.Name, line: Int): String =
+      snippets.getOrElseUpdate((node_name, line),
+        PIDE_AI_Util.numbered_lines_range(doc(node_name), line, line + snippet_lines - 1))
+
+    private val source_nodes = mutable.Map.empty[String, Either[String, Document.Node.Name]]
+    def source_node(source_name: String): Either[String, Document.Node.Name] =
+      source_nodes.getOrElseUpdate(source_name,
+        try { Right(session.resources.source_node_name(session.store, source_name)) }
+        catch { case ERROR(msg) => Left(msg) })
+
+    // cf. Document.Snapshot.find_command_position
+    def def_position(id: Document_ID.Generic, offset: Symbol.Offset): Option[(String, Int)] =
+      for {
+        command <- snapshot.get_command(id)
+        start_line <- snapshot.command_node(command).command_start_line(command)
+      } yield {
+        val prefix = if (offset == 0) ""
+          else command.source(Text.Range(0, command.chunk.decode(offset)))
+        (command.node_name.node, start_line + Library.count_newlines(prefix))
+      }
 
     def resolved(
       name_space_entry: Name_Space.Entry,
@@ -47,25 +69,22 @@ object PIDE_AI_Origin {
     ): PIDE_AI_Origin = PIDE_AI_Origin(name, name_space_entry.kind,
       def_label(name_space_entry, session.resources.unicode_symbols),
       location = Some(Right(node_name)),
-      line = Some(line), snippet = Option.when(snippet_lines > 0)(
-        PIDE_AI_Util.numbered_lines_range(doc(node_name), line, line + snippet_lines - 1)))
+      line = Some(line), snippet = Option.when(snippet_lines > 0)(snippet(node_name, line)))
 
     def resolve(name_space_entry: Name_Space.Entry, name: String): Option[PIDE_AI_Origin] = {
       def resolve_at(source_name: String, line: Int): Option[PIDE_AI_Origin] =
-        try {
-          val node_name = session.resources.source_node_name(session.store, source_name)
-          Option.when(filter_node_names.forall(_.contains(node_name)))(
-            resolved(name_space_entry, name, node_name, line))
-        }
-        catch {
-          case ERROR(msg) => Some(unresolved(name_space_entry, name, source_name, line, msg,
+        source_node(source_name) match {
+          case Right(node_name) =>
+            Option.when(filter_node_names.forall(_.contains(node_name)))(
+              resolved(name_space_entry, name, node_name, line))
+          case Left(msg) => Some(unresolved(name_space_entry, name, source_name, line, msg,
             session.resources.unicode_symbols))
         }
       name_space_entry.properties match {
         case Position.Item_Def_File(def_file, def_line, _) => resolve_at(def_file, def_line)
         case Position.Item_Def_Id(def_id, def_range) =>
-          snapshot.find_command_position(def_id, def_range.start) match {
-            case Some(pos) => resolve_at(pos.name, pos.line1)
+          def_position(def_id, def_range.start) match {
+            case Some((source_name, line)) => resolve_at(source_name, line)
             case None => Some(PIDE_AI_Origin(name, name_space_entry.kind,
               def_label(name_space_entry, session.resources.unicode_symbols),
               note = Some(origin_not_loaded)))
@@ -103,10 +122,12 @@ object PIDE_AI_Origin {
     origins: List[PIDE_AI_Origin],
     cwd: Option[Path]
   ): Map[String, List[JSON.Object.T]] = {
+    val printed = mutable.Map.empty[Document.Node.Name, String]
     val grouped = origins.foldLeft(VectorMap.empty[String, List[PIDE_AI_Origin]]) {
       case (groups, origin) =>
         val node = origin.location match {
-          case Some(Right(node_name)) => resources.print_node_name(node_name, cwd)
+          case Some(Right(node_name)) =>
+            printed.getOrElseUpdate(node_name, resources.print_node_name(node_name, cwd))
           case Some(Left(source_name)) => PIDE_AI_Util.print_file(source_name, cwd)
           case None => ""
         }

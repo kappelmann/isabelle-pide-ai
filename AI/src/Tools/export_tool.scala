@@ -18,9 +18,15 @@ object Export_Tool {
     path
   }
 
-  def exports(session: PIDE_AI_Session): List[Export.Entry] =
-    session.snapshot().all_exports.values.toList
+  val node_exports: PIDE_AI_Node_Cache.Data[List[Export.Entry]] =
+    PIDE_AI_Node_Cache.Data(_.exports)
+
+  def exports(session: PIDE_AI_Session): List[Export.Entry] = {
+    val view = session.node_cache.view(session.snapshot())
+    view.snapshot.version.nodes.iterator.collect { case (name, _) if name.is_theory => name }
+      .flatMap(view(node_exports, _)).toList
       .sortBy(entry => (entry.entry_name.theory, entry.entry_name.name))
+  }
 
   def write_exports(
     session: PIDE_AI_Session,

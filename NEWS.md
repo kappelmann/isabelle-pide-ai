@@ -9,6 +9,8 @@ New in this PIDE AI version
 New in PIDE AI 2026
 ----------------------------
 
+* New cache for node data including service (option `pide_ai_node_cache_delay`). Significantly improve performance of tools using caches.
+* `create_scratch` now uses `Scratch_<n>` as a default. INCOMPATIBILITY.
 * New argument `disk_sync` to opt into initial disk synchronisation for tools.
 * `edit_get_state`: edit time now counts against `timeout_ms`.
 * Tool arguments and outputs now consistently take milliseconds. INCOMPATIBILITY.

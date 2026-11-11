@@ -8,7 +8,12 @@ import isabelle._
 
 import java.io.{File => JFile}
 
-class Create_Scratch_Tool extends PIDE_AI_Tool("create_scratch") {
+object Create_Scratch_Tool {
+  type Data = Synchronized[Option[JFile]]
+}
+
+class Create_Scratch_Tool extends PIDE_AI_Tool("create_scratch")
+with Session_Data_Service[Create_Scratch_Tool.Data] {
   def description: String =
     "Create a temporary file for experimentation. " +
     "Files are cleaned up on session stop."
@@ -22,41 +27,37 @@ class Create_Scratch_Tool extends PIDE_AI_Tool("create_scratch") {
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(
     List(PIDE_AI_Tool_Schema.running_session_arg, name_suffix_arg, extension_arg))
 
-  private val scratch_prefix: String = "Scratch_"
-  private val scratch_tmpdir_prefix: String = "tmp_pide_ai_scratch"
-  private val scratch_dirs = Synchronized[Map[PIDE_AI_Session, Option[JFile]]](Map.empty)
+  private val file_prefix: String = "Scratch_"
+  private val dir_prefix: String = "tmp_pide_ai_scratch"
 
-  override def started(event: PIDE_AI_Service.Session_Event): Unit =
-    scratch_dirs.change(_ + (event.session -> None))
+  def start_data(event: PIDE_AI_Service.Session_Event): Create_Scratch_Tool.Data =
+    Synchronized(None)
 
-  private def get_scratch_dir(session: PIDE_AI_Session): JFile =
-    scratch_dirs.change_result { dirs =>
-      dirs.get(session) match {
-        case None =>
-          error(s"Cannot create scratch file: session ${quote(session.id)} is not running")
-        case Some(Some(dir)) if dir.isDirectory => (dir, dirs)
-        case _ =>
-          val dir = Isabelle_System.tmp_dir(scratch_tmpdir_prefix)
-          (dir, dirs + (session -> Some(dir)))
-      }
-    }
-
-  override def stopping(event: PIDE_AI_Service.Session_Event): Unit = {
-    val dir = scratch_dirs.change_result(dirs =>
-      (dirs.get(event.session).flatten, dirs - event.session))
-    dir.foreach(Isabelle_System.rm_tree)
-  }
+  def stop_data(event: PIDE_AI_Service.Session_Event, data: Create_Scratch_Tool.Data): Unit =
+    data.change { dir => dir.foreach(Isabelle_System.rm_tree); None }
 
   def create_scratch(
     session: PIDE_AI_Session,
     name_suffix: Option[String],
     extension: String
-  ): (Path, Boolean) = scratch_dirs.synchronized {
-    val suffix = name_suffix.getOrElse(Date.now().format(Date.Format("yyyy_MM_dd_HH_mm_ss_SSS")))
-    val base_name = scratch_prefix + suffix
-    val file_name = base_name + extension
-    val file_path = (File.path(get_scratch_dir(session)) + Path.basic(file_name)).canonical
-    (file_path, file_path.file.createNewFile())
+  ): (Path, Boolean) = {
+    def not_running: Nothing =
+      error(s"Cannot create scratch file: session ${quote(session.id)} is not running")
+    val scratch_dir = data(session).getOrElse(not_running)
+    scratch_dir.change_result { current =>
+      if (!data(session).contains(scratch_dir)) not_running
+      val dir = current.filter(_.isDirectory).getOrElse(Isabelle_System.tmp_dir(dir_prefix))
+      def file_path(suffix: String): Path =
+        File.path(dir) + Path.basic(file_prefix + suffix + extension)
+      val (path, created) = name_suffix match {
+        case Some(suffix) =>
+          val path = file_path(suffix)
+          (path, path.file.createNewFile())
+        case None =>
+          (Iterator.from(1).map(i => file_path(i.toString)).find(_.file.createNewFile()).get, true)
+      }
+      ((path.canonical, created), Some(dir))
+    }
   }
 
   def handle(

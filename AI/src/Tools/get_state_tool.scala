@@ -144,12 +144,13 @@ object Get_State_Tool {
       edited: Int,
       timed_out: Boolean
     ): JSON.Object.T = {
-      val nodes = snapshot.version.nodes
       val states_json = PIDE_AI_Document_Command.States.json(states, request.show,
         Line.Document(snapshot.node.source), long_running_threshold, resources.unicode_symbols, cwd)
       val unterminated = states.exists(!_.command_status.is_terminated)
+      lazy val view = session.node_cache.view(session.snapshot())
+      lazy val nodes = view.snapshot.version.nodes
       lazy val dynamic_thys = PIDE_AI_Nodes.Loaded(resources, nodes).dynamic
-      val thys = PIDE_AI_Nodes.node_theory(nodes, node_name).toList
+      lazy val thys = PIDE_AI_Nodes.node_theory(nodes, node_name).toList
       val blocked = PIDE_AI_Nodes.blocked_by(resources, snapshot)
       def statuses_json(
         show: PIDE_AI_Theory_Status.Statuses.Show,
@@ -158,7 +159,7 @@ object Get_State_Tool {
         show match {
           case PIDE_AI_Theory_Status.Statuses.Show.none => JSON.Object.empty
           case _ =>
-            val statuses = PIDE_AI_Theory_Status.Statuses(snapshot,
+            val statuses = PIDE_AI_Theory_Status.Statuses(view,
               dynamic_thys.filter(names -- thys))
             if (!statuses.exists(status => show.contains(status.overall_status))) JSON.Object.empty
             else PIDE_AI_Theory_Status.Statuses.json(resources, statuses, show, cwd)
@@ -170,12 +171,12 @@ object Get_State_Tool {
       val other_cmds_running =
         if (!request.show_other_cmds_running.show(unterminated)) JSON.Object.empty
         else {
-          val cmds = selection.parts.map(_._1).toSet
-          val selections = PIDE_AI_Document_Command.Selection.nodes(session, snapshot, dynamic_thys)
-            .map((node_snapshot, node_selection) =>
-              node_snapshot -> node_selection.filter((cmd, _) => !cmds(cmd)))
-          PIDE_AI_Document_Command.nodes_running_json(resources, selections,
-            1, long_running_threshold, cwd)
+          val selected = selection.parts.map(_._1).toSet
+          val selections = PIDE_AI_Document_Command.Selection.running(session, view, dynamic_thys)
+            .map((node_snapshot, running) =>
+              node_snapshot -> running.filter((cmd, _) => !selected(cmd)))
+          PIDE_AI_Document_Command.nodes_running_json(resources, selections, 1,
+            long_running_threshold, cwd)
         }
       states_json ++ JSON_Object.flatten(Option.when(edited > 0)(
         PIDE_AI_Document_Command.States.cmds_key("edited_omitted") -> edited),

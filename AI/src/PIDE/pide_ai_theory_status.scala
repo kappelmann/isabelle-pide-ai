@@ -14,7 +14,8 @@ object PIDE_AI_Theory_Status {
     val node = snapshot.version.nodes(name)
     var theory_status = Document_Status.Theory_Status.NONE
     var total = 0
-    var timing_ms = 0L
+    var finished_ms = 0L
+    val running_timings = List.newBuilder[Document_Status.Command_Timings]
     val now = Date.now()
     val counts = mutable.Map[PIDE_AI_Command_Status, Int]().withDefaultValue(0)
     for (cmd <- node.commands.iterator) {
@@ -22,7 +23,8 @@ object PIDE_AI_Theory_Status {
       theory_status = Document_Status.Theory_Status.merge(theory_status, status.theory_status)
       if (!PIDE_AI_Document_Command.is_ignorable(snapshot, cmd, status)) {
         total += 1
-        timing_ms += status.timings.sum(now).ms
+        if (status.timings.has_running) running_timings += status.timings
+        else finished_ms += status.timings.sum(now).ms
         PIDE_AI_Command_Status.statuses(status).foreach(counts(_) += 1)
       }
     }
@@ -45,9 +47,12 @@ object PIDE_AI_Theory_Status {
       else Document_Status.Overall_Status.failed
     val header_errors =
       PIDE_AI_Nodes.failed_header_state(snapshot.switch(name)).toList.flatMap(_.errors)
-    PIDE_AI_Theory_Status(name, overall_status, timing_ms, percentage, header_errors,
-      counts.toMap)
+    PIDE_AI_Theory_Status(name, overall_status, finished_ms, running_timings.result(), percentage,
+      header_errors, counts.toMap)
   }
+
+  val data: PIDE_AI_Node_Cache.Data[PIDE_AI_Theory_Status] =
+    PIDE_AI_Node_Cache.Data(snapshot => PIDE_AI_Theory_Status(snapshot, snapshot.node_name))
 
   object Statuses {
     enum Show {
@@ -62,10 +67,16 @@ object PIDE_AI_Theory_Status {
     }
 
     def apply(
-      snapshot: Document.Snapshot,
+      view: PIDE_AI_Node_Cache.View,
       names: List[Document.Node.Name]
     ): List[PIDE_AI_Theory_Status] =
-      names.map(PIDE_AI_Theory_Status(snapshot, _))
+      names.map(view(data, _))
+
+    def running(
+      view: PIDE_AI_Node_Cache.View,
+      names: List[Document.Node.Name]
+    ): List[Document.Node.Name] =
+      names.filter(view(data, _).count(PIDE_AI_Command_Status.running) > 0)
 
     def thys_key(overall_status: Document_Status.Overall_Status): String = "thys_" + overall_status
 
@@ -94,14 +105,21 @@ object PIDE_AI_Theory_Status {
 sealed case class PIDE_AI_Theory_Status(
   node_name: Document.Node.Name,
   overall_status: Document_Status.Overall_Status,
-  timing_ms: Long,
+  finished_ms: Long,
+  running_timings: List[Document_Status.Command_Timings],
   percentage: Int,
   header_errors: List[PIDE_AI_Message],
   counts: Map[PIDE_AI_Command_Status, Int]
 ) {
+  def timing_ms: Long = {
+    val now = Date.now()
+    finished_ms + running_timings.map(_.sum(now).ms).sum
+  }
+
   def is_ok: Boolean = overall_status == Document_Status.Overall_Status.ok
   def is_failed: Boolean = overall_status == Document_Status.Overall_Status.failed
   def is_pending: Boolean = overall_status == Document_Status.Overall_Status.pending
+  def count(status: PIDE_AI_Command_Status): Int = counts.getOrElse(status, 0)
 
   def json(unicode_symbols: Boolean, cwd: Option[Path]): JSON.Object.T =
     JSON_Object.flatten(
