@@ -54,7 +54,7 @@ object PIDE_AI_Dependencies {
   ): List[Document.Node.Name] = {
     def is_unloaded(name: Document.Node.Name): Boolean =
       !exclude(name) && !resources.loaded_theory(name) &&
-      !PIDE_AI_Nodes.is_loaded_dynamic(nodes(name)) && resources.is_loadable(name)
+      !PIDE_AI_Nodes.is_loaded_dynamic(nodes, name) && resources.is_loadable(name)
     val unloaded = known_dependencies(resources, nodes, node_names).filter(is_unloaded)
     disk_dependencies(resources, conditions, unloaded, progress).filter(is_unloaded)
   }
@@ -63,21 +63,21 @@ object PIDE_AI_Dependencies {
     nodes: Document.Nodes,
     names: List[Document.Node.Name]
   ): List[Document.Node.Name] =
-    nodes.descendants(names).filter(name => PIDE_AI_Nodes.is_loaded_dynamic(nodes(name)))
+    nodes.descendants(names).filter(PIDE_AI_Nodes.is_loaded_dynamic(nodes, _))
 
   def unused_files(
     resources: Resources,
     nodes: Document.Nodes,
     removed: List[Document.Node.Name]
   ): List[Document.Node.Name] = {
-    def is_loaded(name: Document.Node.Name) = PIDE_AI_Nodes.is_loaded_dynamic(nodes(name))
+    def is_loaded(name: Document.Node.Name) = PIDE_AI_Nodes.is_loaded_dynamic(nodes, name)
     val blobs = removed.flatMap(name => blobs_names(nodes(name))).distinct.filter(is_loaded)
       .map(blob_name => blob_name -> resources.make_theory_name(blob_name).filter(is_loaded))
     val removed1 = removed.toSet ++ blobs.flatMap(_._2)
     for {
       (blob_name, opt_thy) <- blobs
       if nodes.commands_loading(blob_name).forall(cmd => removed1(cmd.node_name))
-      name <- blob_name :: opt_thy.toList
+      name <- blob_name :: opt_thy.toList if !removed.contains(name)
     } yield name
   }
 
@@ -86,7 +86,8 @@ object PIDE_AI_Dependencies {
     nodes: Document.Nodes,
     names: List[Document.Node.Name]
   ): List[Document.Node.Name] = {
-    val descendants = loaded_descendants(nodes, names)
+    val descendants =
+      loaded_descendants(nodes, names ::: names.flatMap(resources.make_theory_name))
     descendants ::: unused_files(resources, nodes, descendants)
   }
 }

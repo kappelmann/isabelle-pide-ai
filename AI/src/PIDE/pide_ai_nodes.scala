@@ -8,11 +8,13 @@ import isabelle._
 
 object PIDE_AI_Nodes {
   // a cleaned node remains in version.nodes but with empty source
-  def is_loaded_dynamic(node: Document.Node): Boolean =
+  def is_loaded_dynamic(nodes: Document.Nodes, name: Document.Node.Name): Boolean = {
+    val node = nodes(name)
     node.get_blob match {
-      case Some(blob) => blob.source.nonEmpty
+      case Some(blob) => blob.source.nonEmpty || nodes.commands_loading(name).nonEmpty
       case None => !node.is_empty
     }
+  }
 
   def loading_command(nodes: Document.Nodes, name: Document.Node.Name): Option[Command] =
     nodes.commands_loading(name).headOption
@@ -49,7 +51,7 @@ object PIDE_AI_Nodes {
       val unordered = nodes.names_iterator.filterNot(ordered.toSet).toList
       val all_nodes = (ordered ::: unordered).filter(_.is_theory)
       val (base_session, dynamic) = all_nodes.partition(resources.loaded_theory)
-      Loaded(base_session, dynamic.filter(name => is_loaded_dynamic(nodes(name))))
+      Loaded(base_session, dynamic.filter(is_loaded_dynamic(nodes, _)))
     }
   }
 

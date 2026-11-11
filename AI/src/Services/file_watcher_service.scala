@@ -21,7 +21,7 @@ class File_Watcher_Service extends PIDE_AI_Service("file_watcher") {
     () => {
       val version = session.snapshot().version
       if (cache._1 ne version) cache = (version, version.nodes.iterator.collect {
-        case (name, node) if PIDE_AI_Nodes.is_loaded_dynamic(node) => name
+        case (name, _) if PIDE_AI_Nodes.is_loaded_dynamic(version.nodes, name) => name
       }.toList)
       cache._2
     }

@@ -107,6 +107,7 @@ sealed case class PIDE_AI_Document_Model(
     else Document.Node.Perspective_Text.empty
 
   def edits: List[Document.Edit_Text] =
-    if (is_stable && node.edit_perspective == node_perspective) Nil
+    if (is_stable && node.edit_perspective == node_perspective &&
+        (is_theory || node.get_blob.isDefined)) Nil
     else node_edits(get_thy(), pending_edits, node_perspective)
 }

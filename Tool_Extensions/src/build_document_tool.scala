@@ -33,7 +33,7 @@ object Build_Document_Tool {
 
     val snapshot = session.snapshot()
     val (unloaded, loaded) = nodes.filterNot(session.resources.loaded_theory)
-      .partition(node => !PIDE_AI_Nodes.is_loaded_dynamic(snapshot.version.nodes(node)))
+      .partition(node => !PIDE_AI_Nodes.is_loaded_dynamic(snapshot.version.nodes, node))
     if (unloaded.nonEmpty) error("Theories not loaded: " + print_nodes(unloaded))
     val pending = loaded.filterNot(node => snapshot.theory_consolidated(node.theory))
     if (pending.nonEmpty) error("Theories still pending: " + print_nodes(pending))
