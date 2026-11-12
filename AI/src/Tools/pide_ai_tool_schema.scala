@@ -36,6 +36,13 @@ object PIDE_AI_Tool_Schema {
     JSON_Schema.Format.int(minimum = Some(minimum)).map(Time.ms(_), _.ms.toInt)
   val long_running_arg = JSON_Schema.Arg.optional("long_running_ms",
     s"Threshold. Default: ${PIDE_AI_Session.long_running_threshold_option}.", ms_format(0))
+  val stop_on_arg = JSON_Schema.Arg.default("stop_on",
+    s"${PIDE_AI_Tool_Util.Stop_On.any_failed} = first failure or all terminated.",
+    JSON_Schema.Format.enumeration(PIDE_AI_Tool_Util.Stop_On.values),
+    PIDE_AI_Tool_Util.Stop_On.any_failed)
+  def progress_delay_arg(option: String): JSON_Schema.Arg[Option[Time]] =
+    JSON_Schema.Arg.optional("progress_delay_ms", s"Between reports. Default: $option.",
+      ms_format(0))
 
   def show_thy_statuses_arg(
     name: String,

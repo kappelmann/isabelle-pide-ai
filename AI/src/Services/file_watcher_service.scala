@@ -25,8 +25,8 @@ with Session_Data_Service[File_Watcher_Service.Data] {
     var loaded = (Document.Version.init, List.empty[Document.Node.Name])
     def loaded_names(): List[Document.Node.Name] = {
       val version = session.snapshot().version
-      if (loaded._1 ne version) loaded = (version,
-        version.nodes.names_iterator.filter(PIDE_AI_Nodes.is_loaded(version.nodes, _)).toList)
+      if (loaded._1 ne version) loaded = (version, version.nodes.names_iterator
+        .filter(session.resources.is_loaded_node(version.nodes, _)).toList)
       loaded._2
     }
 

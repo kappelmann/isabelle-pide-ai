@@ -10,15 +10,6 @@ object PIDE_AI_Nodes {
   def blobs_names(node: Document.Node): List[Document.Node.Name] =
     node.load_commands.flatMap(_.blobs_names)
 
-  // a cleaned node remains in version.nodes but with empty source
-  def is_loaded(nodes: Document.Nodes, name: Document.Node.Name): Boolean = {
-    val node = nodes(name)
-    node.get_blob match {
-      case Some(blob) => blob.source.nonEmpty || nodes.commands_loading(name).nonEmpty
-      case None => !node.is_empty
-    }
-  }
-
   def loading_command(nodes: Document.Nodes, name: Document.Node.Name): Option[Command] =
     nodes.commands_loading(name).headOption
 
@@ -54,8 +45,9 @@ object PIDE_AI_Nodes {
       val ordered = nodes.topological_order
       val unordered = nodes.names_iterator.filterNot(ordered.toSet).toList
       val all_nodes = (ordered ::: unordered).filter(_.is_theory)
-      val (base_session, dynamic) = all_nodes.partition(resources.is_base_session_theory)
-      Loaded(base_session.distinctBy(_.theory), dynamic.filter(is_loaded(nodes, _)))
+      val (base_session, dynamic) = all_nodes.partition(resources.is_base_session_thy)
+      Loaded(base_session.distinctBy(_.theory),
+        dynamic.filter(resources.is_loaded_dynamic_thy(nodes, _)))
     }
   }
 

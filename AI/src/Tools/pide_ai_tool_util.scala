@@ -33,9 +33,19 @@ object PIDE_AI_Tool_Util {
     args: JSON.Object.T,
     cwd: Option[Path]
   ): Document.Node.Name =
-    session.resources.node_name(PIDE_AI_Tool_Schema.node_arg.get(args), cwd)
+    session.resources.node_name(session.snapshot().version.nodes,
+      PIDE_AI_Tool_Schema.node_arg.get(args), cwd)
 
   enum Sync { case none, node, node_and_ancestors }
+
+  enum Stop_On {
+    case any_failed, all_terminated
+    def stop(statuses: List[Document_Status.Command_Status]): Boolean =
+      statuses.forall(_.is_terminated) || this == any_failed && statuses.exists(_.is_failed)
+    def stop_thys(statuses: List[PIDE_AI_Theory_Status]): Boolean =
+      statuses.forall(!_.is_pending) ||
+        this == any_failed && statuses.exists(_.count(PIDE_AI_Command_Status.failed) > 0)
+  }
 
   def stable_synced(
     session: PIDE_AI_Session,
@@ -64,7 +74,7 @@ object PIDE_AI_Tool_Util {
     def node = quote(session.resources.print_node_name(node_name, cwd))
     val snapshot = try { session.node_snapshot(node_name) } catch {
       case ERROR(_) =>
-        if (PIDE_AI_Nodes.is_loaded(session.tip_version(progress).nodes, node_name))
+        if (session.resources.is_loaded_node(session.tip_version(progress).nodes, node_name))
           error(s"The node $node is loaded but has not been processed yet. " +
             retry_soon_message)
         else {

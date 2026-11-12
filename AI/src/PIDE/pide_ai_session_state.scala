@@ -99,22 +99,51 @@ object PIDE_AI_Session_State {
       count_entry(props, "java_threads_total", ML_Statistics.Java_Threads_Total))
   }
 
-  def json(
+  sealed case class Selection(
     session: PIDE_AI_Session,
-    nodes: Option[List[String]],
-    show: Show,
+    thys: Option[List[Document.Node.Name]])
+
+  def apply(selection: Selection): PIDE_AI_Session_State = {
+    val session = selection.session
+    val view = session.node_cache.view(session.snapshot())
+    val loaded = PIDE_AI_Nodes.Loaded(session.resources, view.snapshot.version.nodes)
+    PIDE_AI_Session_State(session, view, loaded.base_session,
+      selection.thys.fold(loaded.dynamic)(thys => loaded.dynamic.filter(thys.toSet)))
+  }
+
+  def await(
+    selections: List[Selection],
+    stop: List[PIDE_AI_Session_State] => Boolean,
+    timeout: Option[Time],
+    delay: Time,
+    wait_ratio: Double,
+    message: List[PIDE_AI_Session_State] => JSON.T,
+    progress_delay: Time,
+    progress: PIDE_AI_Progress
+  ): (List[PIDE_AI_Session_State], Boolean) =
+    PIDE_AI_Progress.await_adaptive(progress, message, timeout, delay, wait_ratio,
+      progress_delay) {
+      selections.foreach(_.session.require_ready())
+      val states = selections.map(PIDE_AI_Session_State(_))
+      (states, stop(states))
+    }
+}
+
+sealed case class PIDE_AI_Session_State(
+  session: PIDE_AI_Session,
+  view: PIDE_AI_Node_Cache.View,
+  base_session_thys: List[Document.Node.Name],
+  dynamic_thys: List[Document.Node.Name]
+) {
+  lazy val statuses: List[PIDE_AI_Theory_Status] =
+    PIDE_AI_Theory_Status.Statuses(view, dynamic_thys)
+
+  def json(
+    initial_thys: List[Document.Node.Name],
+    show: PIDE_AI_Session_State.Show,
     long_running_threshold: Time,
     cwd: Option[Path]
   ): JSON.Object.T = {
-    lazy val view = session.node_cache.view(session.snapshot())
-    lazy val snapshot = view.snapshot
-    lazy val theories = PIDE_AI_Nodes.Loaded(session.resources, snapshot.version.nodes)
-    lazy val dynamic_thys = nodes match {
-      case None => theories.dynamic
-      case Some(nodes) =>
-        val selected = nodes.map(session.resources.node_name(_, cwd)).toSet
-        theories.dynamic.filter(selected.contains)
-    }
     def print_nodes(names: List[Document.Node.Name]): List[String] =
       names.map(session.resources.print_node_name(_, cwd))
     def optional_entry(key: String, shown: Boolean)(json: => JSON.Object.T): JSON.Object.T =
@@ -131,18 +160,21 @@ object PIDE_AI_Session_State {
     optional_entry(Markup.BAD, show.bad)(
       PIDE_AI_Document_Command.nodes_bad_json(session.resources, view,
         dynamic_thys.flatMap(thy =>
-          thy :: PIDE_AI_Nodes.blobs_names(snapshot.version.nodes(thy))).distinct, cwd)) ++
-    PIDE_AI_Theory_Status.Statuses.json(session.resources,
-      PIDE_AI_Theory_Status.Statuses(view, dynamic_thys), show.dynamic_thys, cwd) ++
+          thy :: PIDE_AI_Nodes.blobs_names(view.snapshot.version.nodes(thy))).distinct, cwd)) ++
+    JSON.optional("thys_loaded" ->
+      proper_list(print_nodes(dynamic_thys.filterNot(initial_thys.toSet)))) ++
+    JSON.optional("thys_unloaded" ->
+      proper_list(print_nodes(initial_thys.filterNot(dynamic_thys.toSet)))) ++
+    PIDE_AI_Theory_Status.Statuses.json(session.resources, statuses, show.dynamic_thys, cwd) ++
     JSON.optional("base_session_thys" ->
-      Option.when(show.base_session_thys)(print_nodes(theories.base_session))) ++
+      Option.when(show.base_session_thys)(print_nodes(base_session_thys))) ++
     JSON.optional("session_dirs" -> Option.when(show.session_dirs)(
       session.directories().map(PIDE_AI_Util.print_path(_, cwd)))) ++
-    options_json(show.options, session.session_options) ++
+    PIDE_AI_Session_State.options_json(show.options, session.session_options) ++
     JSON_Object.if_proper(show.statistics, {
       val statistics = session.recent_runtime_statistics()
       if (statistics.isEmpty) JSON_Object("note" -> "no ML statistics reported yet")
-      else ml_stats_json(statistics)
+      else PIDE_AI_Session_State.ml_stats_json(statistics)
     })
   }
 }

@@ -113,10 +113,6 @@ object JSON_Schema {
       format.schema ++ JSON.optional("description" -> proper_string(description)) ++
       JSON.optional("default" -> default.map(format.apply))
 
-    private def decode[A](name: String, format: Format[A])(json: JSON.T): A =
-      format.unapply(json).getOrElse(
-        throw new Arg_Error(List(name), "malformed " + JSON.Format(json)))
-
     private def missing(name: String): Nothing = throw new Arg_Error(List(name), "missing")
 
     final class Required[A] private[JSON_Schema](
@@ -126,7 +122,7 @@ object JSON_Schema {
     ) extends Arg[A](name) {
       def required: Boolean = true
       def schema: JSON.Object.T = Arg.schema(format, description, None)
-      def get(obj: JSON.Object.T): A = obj.get(name).fold(missing(name))(decode(name, format))
+      def get(obj: JSON.Object.T): A = obj.get(name).fold(missing(name))(decode(format))
       def apply(value: A): JSON.Object.T = JSON_Object(name -> format(value))
     }
 
@@ -137,7 +133,7 @@ object JSON_Schema {
     ) extends Arg[Option[A]](name) {
       def required: Boolean = false
       def schema: JSON.Object.T = Arg.schema(format, description, None)
-      def get(obj: JSON.Object.T): Option[A] = obj.get(name).map(decode(name, format))
+      def get(obj: JSON.Object.T): Option[A] = obj.get(name).map(decode(format))
       def apply(value: Option[A]): JSON.Object.T =
         value.fold(JSON_Object())(v => JSON_Object(name -> format(v)))
     }
@@ -150,7 +146,7 @@ object JSON_Schema {
     ) extends Arg[A](name) {
       def required: Boolean = false
       def schema: JSON.Object.T = Arg.schema(format, description, Some(default))
-      def get(obj: JSON.Object.T): A = obj.get(name).fold(default)(decode(name, format))
+      def get(obj: JSON.Object.T): A = obj.get(name).fold(default)(decode(format))
       def apply(value: A): JSON.Object.T = JSON_Object(name -> format(value))
     }
 
@@ -169,6 +165,10 @@ object JSON_Schema {
     def schema: JSON.Object.T
     def get(obj: JSON.Object.T): A
     def apply(value: A): JSON.Object.T
+
+    def decode[B](format: Format[B])(json: JSON.T): B =
+      format.unapply(json).getOrElse(throw new Arg_Error(List(name),
+        "malformed " + JSON.Format(json) + "; expected " + JSON.Format(schema)))
 
     def within[B](obj: JSON.Object.T)(body: A => B): B = {
       val value = get(obj)

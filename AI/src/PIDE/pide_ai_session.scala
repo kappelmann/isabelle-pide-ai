@@ -187,19 +187,18 @@ class PIDE_AI_Session private(
   }
 
   def require_ready(): Unit =
-    if (!is_ready)
-      error(s"PIDE session ${quote(id)} is not ready. " +
-        s"Its session phase is ${quote(phase.print)}")
+    if (!is_ready) error(s"PIDE session ${quote(id)} is not ready. " +
+      s"Its session phase is ${quote(phase.print)}")
 
   def await_while_ready[A](
     progress: PIDE_AI_Progress,
     message: Time => JSON.T,
     delay: => Time,
     progress_delay: Time
-  )(value: => Option[A]): A =
+  )(attempt: => Option[A]): A =
     PIDE_AI_Progress.await_delay(progress, message, delay, progress_delay) {
       require_ready()
-      value
+      attempt
     }
 
   def tip_change: Document.Change = get_state().history.tip
@@ -221,7 +220,7 @@ class PIDE_AI_Session private(
     node_name: Document.Node.Name
   ): Document.Snapshot = {
     val new_snapshot = snapshot.switch(node_name)
-    if (PIDE_AI_Nodes.is_loaded(new_snapshot.version.nodes, node_name)) new_snapshot
+    if (resources.is_loaded_node(new_snapshot.version.nodes, node_name)) new_snapshot
     else error("No PIDE snapshot available for " +
       quote(resources.print_node_name(node_name, None)))
   }
@@ -245,7 +244,7 @@ class PIDE_AI_Session private(
   def update(nodes: Document.Nodes, edits: List[Document.Edit_Text]): Document.Change = {
     if (edits.nonEmpty) {
       val loaded_blobs = nodes.iterator.flatMap { (name, node) =>
-        node.get_blob.filter(_ => PIDE_AI_Nodes.is_loaded(nodes, name)).map(name -> _) }
+        node.get_blob.filter(_ => resources.is_loaded_node(nodes, name)).map(name -> _) }
       val edited_blobs = edits.collect { case (name, Document.Node.Blob(blob)) => name -> blob }
       update(Document.Blobs(loaded_blobs.toMap ++ edited_blobs), edits)
     }
@@ -263,12 +262,11 @@ class PIDE_AI_Session private(
       with_lock(progress) {
         val nodes = tip_version(progress).nodes
         val node = nodes(node_name)
-        if (PIDE_AI_Nodes.is_loaded(nodes, node_name))
+        if (resources.is_loaded_dynamic_thy(nodes, node_name))
           update(nodes, List(node_name -> PIDE_AI_Document_Model.node_perspective(node)
             .copy(overlays = change(node.perspective.overlays))))
         else if (require_theory)
-          error(quote(resources.print_node_name(node_name, None)) +
-            " is not a dynamically loaded theory")
+          error(quote(resources.print_node_name(node_name, None)) + " is not a dynamic theory")
       }
     }
     val result = Future.promise[Unit]
@@ -307,13 +305,16 @@ class PIDE_AI_Session private(
   def read_update(
     nodes: List[(Document.Node.Name, Option[List[(Int, Option[Int])]])],
     hide_others: Boolean,
-    progress: PIDE_AI_Progress
+    progress: PIDE_AI_Progress,
+    sync: Boolean = true
   ): (Map[Document.Node.Name, String], Document.Change) = {
     val (models, change) = with_lock(progress) {
       val version = tip_version(progress)
       val models1 = nodes.map { (name, visible_lines) =>
-        PIDE_AI_Document_Model.make(this, name, version.nodes(name),
-          resources.read_file_content(name), visible_lines,
+        val node = version.nodes(name)
+        val text = if (!sync && resources.is_loaded_node(version.nodes, name)) node.source
+          else resources.read_file_content(name)
+        PIDE_AI_Document_Model.make(this, name, node, text, visible_lines,
           PIDE_AI_Session.range_context(session_options))
       }
       val other_edits = if (!hide_others) Nil
@@ -330,7 +331,7 @@ class PIDE_AI_Session private(
     with_lock(progress) {
       val nodes = tip_version(progress).nodes
       read_update(
-        node_names.filter(PIDE_AI_Nodes.is_loaded(nodes, _)).map(_ -> None),
+        node_names.filter(resources.is_loaded_node(nodes, _)).map(_ -> None),
         hide_others = false, progress = progress)
     }
 
@@ -358,9 +359,11 @@ class PIDE_AI_Session private(
     visible_lines: List[(Int, Option[Int])],
     await_stable_before_resolve: Boolean,
     hide_others: Boolean,
-    progress: PIDE_AI_Progress
+    progress: PIDE_AI_Progress,
+    sync: Boolean = true
   ): String = {
-    val (texts, change) = read_update(List(node_name -> Some(visible_lines)), hide_others, progress)
+    val (texts, change) =
+      read_update(List(node_name -> Some(visible_lines)), hide_others, progress, sync = sync)
     if (await_stable_before_resolve) await_stable(change, progress)
     resolve_dependencies(List(node_name), progress)
     texts(node_name)

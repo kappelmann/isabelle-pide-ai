@@ -10,6 +10,7 @@ import isabelle.pide.ai._
 object Build_Document_Tool {
   def build_documents(
     session: PIDE_AI_Session,
+    snapshot: Document.Snapshot,
     session_name: String,
     thys: Option[List[Document.Node.Name]],
     out_dir: Path,
@@ -25,15 +26,14 @@ object Build_Document_Tool {
       error(s"Session ${quote(session_name)} defines no document: " +
         "its ROOT needs option document=pdf and document_files")
     val document_thys = background.base.all_document_theories
-    val nodes =
-      thys.getOrElse(document_thys.map(thy => session.resources.node_name(thy.path.implode, cwd)))
+    val nodes = thys.getOrElse(document_thys.map(thy =>
+      session.resources.node_name(snapshot.version.nodes, thy.path.implode, cwd)))
     val unknown = nodes.filterNot(node => document_thys.exists(_.theory == node.theory))
     if (unknown.nonEmpty) error(s"Not document theories of ${quote(session_name)}: " +
       print_nodes(unknown))
 
-    val snapshot = session.snapshot()
-    val (unloaded, loaded) = nodes.filterNot(session.resources.is_base_session_theory)
-      .partition(node => !PIDE_AI_Nodes.is_loaded(snapshot.version.nodes, node))
+    val (loaded, unloaded) = nodes.filterNot(session.resources.is_base_session_thy)
+      .partition(session.resources.is_loaded_dynamic_thy(snapshot.version.nodes, _))
     if (unloaded.nonEmpty) error("Theories not loaded: " + print_nodes(unloaded))
     val pending = loaded.filterNot(node => snapshot.theory_consolidated(node.theory))
     if (pending.nonEmpty) error("Theories still pending: " + print_nodes(pending))
@@ -70,8 +70,9 @@ class Build_Document_Tool extends PIDE_AI_Tool("build_document") {
     PIDE_AI_Tool_Result.result {
       val session = PIDE_AI_Tool_Util.running_session_param(server.sessions, args)
       val cwd = context.cwd
-      Build_Document_Tool.build_documents(session, session_name_arg.get(args),
-        thys_arg.get(args).map(_.map(session.resources.node_name(_, cwd))),
+      val snapshot = session.snapshot()
+      Build_Document_Tool.build_documents(session, snapshot, session_name_arg.get(args),
+        thys_arg.get(args).map(_.map(session.resources.node_name(snapshot.version.nodes, _, cwd))),
         PIDE_AI_Util.path(out_dir_arg.get(args), cwd), progress, cwd)
       .map(PIDE_AI_Util.print_path(_, cwd))
     }

@@ -9,6 +9,12 @@ New in this PIDE AI version
 New in PIDE AI 2026
 ----------------------------
 
+* `get_session_state` can now wait for termination or failure via `timeout_ms`.
+* Deleted or renamed files remain addressable by their old path, e.g. to unload them.
+* Malformed tool arguments report their expected schema.
+* New `show_thy` in `get_state` to show the queried node's theory's status.
+* Theories without a final `end` are now reported as failed.
+* `edit` with empty `old_text` now keeps trailing line breaks.
 * New cache for node data including service (option `pide_ai_node_cache_delay`). Significantly improve performance of tools using caches.
 * `create_scratch` now uses `Scratch_<n>` as a default. INCOMPATIBILITY.
 * New argument `disk_sync` to opt into initial disk synchronisation for tools.

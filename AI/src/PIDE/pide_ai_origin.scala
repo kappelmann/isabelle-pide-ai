@@ -47,7 +47,10 @@ object PIDE_AI_Origin {
     private val source_nodes = mutable.Map.empty[String, Either[String, Document.Node.Name]]
     def source_node(source_name: String): Either[String, Document.Node.Name] =
       source_nodes.getOrElseUpdate(source_name,
-        try { Right(session.resources.source_node_name(session.store, source_name)) }
+        try {
+          Right(session.resources.source_node_name(session.store, snapshot.version.nodes,
+            source_name))
+        }
         catch { case ERROR(msg) => Left(msg) })
 
     // cf. Document.Snapshot.find_command_position

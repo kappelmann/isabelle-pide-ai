@@ -497,22 +497,20 @@ object PIDE_AI_Document_Command {
     stop: (Document.Snapshot, List[Document_Status.Command_Status]) => Boolean,
     timeout: Option[Time],
     delay: Time,
-    check_factor: Double,
+    wait_ratio: Double,
     message: Document.Snapshot => JSON.T,
     progress_delay: Time,
     progress: PIDE_AI_Progress
   ): (Document.Snapshot, List[Command], List[Command], Boolean) = {
-    val start = Time.now()
-    var snapshot = session.snapshot()
     var version = Document_ID.none
     var survivors: List[Command] = Nil
     var removed: List[Command] = Nil
     var pending: List[Command] = Nil
     var terminated: List[Document_Status.Command_Status] = Nil
-    var wait = delay
-    session.await_while_ready(progress, _ => message(snapshot), wait, progress_delay) {
-      val check_start = Time.now()
-      snapshot = session.snapshot()
+    val (snapshot, timed_out) = PIDE_AI_Progress.await_adaptive(progress, message, timeout,
+      delay, wait_ratio, progress_delay) {
+      session.require_ready()
+      val snapshot = session.snapshot()
       if (snapshot.version.id != version) {
         version = snapshot.version.id
         val (survivors1, removed1) = commands.partition(snapshot_contains(snapshot, _))
@@ -526,13 +524,9 @@ object PIDE_AI_Document_Command {
           .partition(_._2.is_terminated)
       pending = still_pending.map(_._1)
       terminated = now_terminated.map(_._2) ::: terminated
-      val stopped = stop(snapshot, still_pending.map(_._2) ::: terminated)
-      val now = Time.now()
-      wait = delay max (now - check_start).scale(check_factor)
-      timeout.foreach(t => wait = wait min (start + t - now))
-      Option.when(stopped || timeout.exists(now - start >= _))(
-        (snapshot, survivors, removed, !stopped))
+      (snapshot, stop(snapshot, still_pending.map(_._2) ::: terminated))
     }
+    (snapshot, survivors, removed, timed_out)
   }
 
   def await_states(
@@ -542,7 +536,7 @@ object PIDE_AI_Document_Command {
     stop: (Document.Snapshot, List[Document_Status.Command_Status]) => Boolean,
     timeout: Option[Time],
     delay: Time,
-    check_factor: Double,
+    wait_ratio: Double,
     message: (Document.Snapshot, Iterator[State]) => JSON.T,
     progress_delay: Time,
     progress: PIDE_AI_Progress
@@ -553,7 +547,7 @@ object PIDE_AI_Document_Command {
     }
     val commands = selection.parts.map(_._1).filterNot(is_ignorable_for_good(snapshot, _))
     val (snapshot1, _, removed, timed_out) = await(session, commands, stop, timeout, delay,
-      check_factor, snapshot1 => message.tupled(node_states(snapshot1)), progress_delay, progress)
+      wait_ratio, snapshot1 => message.tupled(node_states(snapshot1)), progress_delay, progress)
     val (node_snapshot, states) = node_states(snapshot1)
     (node_snapshot, states, removed.count(!is_ignorable(snapshot, _)), timed_out)
   }

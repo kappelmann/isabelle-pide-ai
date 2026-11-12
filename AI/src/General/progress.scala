@@ -41,8 +41,30 @@ object PIDE_AI_Progress {
     message: Time => JSON.T,
     delay: => Time,
     progress_delay: Time
-  )(value: => Option[A]): A =
-    await(progress, message, progress_delay)(value.orElse { delay.sleep(); None })
+  )(attempt: => Option[A]): A =
+    await(progress, message, progress_delay)(attempt.orElse { delay.sleep(); None })
+
+  def await_adaptive[A](
+    progress: PIDE_AI_Progress,
+    message: A => JSON.T,
+    timeout: Option[Time],
+    delay: Time,
+    wait_ratio: Double,
+    progress_delay: Time
+  )(check: => (A, Boolean)): (A, Boolean) = {
+    val start = Time.now()
+    var wait = delay
+    var last: Option[A] = None
+    await_delay(progress, _ => message(last.get), wait, progress_delay) {
+      val check_start = Time.now()
+      val (result, stopped) = check
+      last = Some(result)
+      val now = Time.now()
+      val adaptive = delay max (now - check_start).scale(wait_ratio)
+      wait = timeout.fold(adaptive)(t => adaptive min (start + t - now))
+      Option.when(stopped || timeout.exists(now - start >= _))((result, !stopped))
+    }
+  }
 
   def await_guarded[S, A](
     state: Synchronized[S],
@@ -50,9 +72,9 @@ object PIDE_AI_Progress {
     message: Time => JSON.T,
     delay: Time,
     progress_delay: Time
-  )(value: S => Option[A]): A =
+  )(attempt: S => Option[A]): A =
     await(progress, message, progress_delay)(
-      state.timed_access(_ => Some(Time.now() + delay), s => value(s).map(_ -> s)))
+      state.timed_access(_ => Some(Time.now() + delay), s => attempt(s).map(_ -> s)))
 
   def theories_progress_msg(status: Progress.Nodes_Status): Option[Progress.Msg] = {
     val theories = status.domain.map(name => name.theory -> status(name))

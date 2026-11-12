@@ -69,8 +69,15 @@ class Ranged_Origins_Tool extends PIDE_AI_Tool("ranged_origins") with PIDE_AI_To
         PIDE_AI_Tool_Util.require_stable_synced_node_snapshot(session, node_name,
           PIDE_AI_Tool_Schema.disk_sync_arg.get(args), progress, cwd)
       val snippet_lines = snippet_lines_arg.get(args)
-      val filter_node_names =
-        located_in_arg.get(args).map(_.map(session.resources.node_name(_, cwd)).toSet)
+      val filter_node_names = located_in_arg.get(args).map { names =>
+        val resources = session.resources
+        val nodes = snapshot.version.nodes
+        val (located, others) = names.map(resources.node_name(nodes, _, cwd)).partition(name =>
+          resources.is_loaded_node(nodes, name) || resources.is_base_session_node(name))
+        if (others.nonEmpty) error("Neither loaded nor base session node: " +
+          commas_quote(others.map(resources.print_node_name(_, cwd))))
+        located.toSet
+      }
       val range = PIDE_AI_Util.check_text_range(Line.Document(snapshot.node.source),
         PIDE_AI_Tool_Schema.start_line_arg.get(args),
         PIDE_AI_Tool_Schema.opt_end_line_arg.get(args))

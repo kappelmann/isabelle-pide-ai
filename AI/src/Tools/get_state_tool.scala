@@ -7,19 +7,12 @@ package isabelle.pide.ai
 import isabelle._
 
 object Get_State_Tool {
-  def get_state_delay(options: Options): Time =
+  def delay(options: Options): Time =
     options.seconds("pide_ai_get_state_delay")
-  def get_state_check_factor(options: Options): Double =
-    options.real("pide_ai_get_state_check_factor")
-  val get_state_progress_delay_option: String = "pide_ai_get_state_progress_delay"
-  def get_state_progress_delay(options: Options): Time =
-    options.seconds(get_state_progress_delay_option)
-
-  enum Stop_On {
-    case any_failed, all_terminated
-    def stop(statuses: List[Document_Status.Command_Status]): Boolean =
-      statuses.forall(_.is_terminated) || this == any_failed && statuses.exists(_.is_failed)
-  }
+  def wait_ratio(options: Options): Double =
+    options.real("pide_ai_get_state_wait_ratio")
+  val progress_delay_option: String = "pide_ai_get_state_progress_delay"
+  def progress_delay(options: Options): Time = options.seconds(progress_delay_option)
 
   enum Summary { case warnings, terminated_slow }
 
@@ -39,10 +32,6 @@ object Get_State_Tool {
     "For a non-theory file, the state is that of the command loading it."
 
   object Request {
-    val stop_on_arg = JSON_Schema.Arg.default("stop_on",
-      s"${Stop_On.any_failed} = first failure or all terminated.",
-      JSON_Schema.Format.enumeration(Stop_On.values), Stop_On.any_failed)
-
     val summary_arg = JSON_Schema.Arg.default("summary",
       "Optional entries. " +
         s"${Summary.terminated_slow} = above ${PIDE_AI_Tool_Schema.long_running_arg.name}.",
@@ -69,6 +58,10 @@ object Get_State_Tool {
       "details_unproblematic_limit",
       "Unproblematic commands to return. Default: all.",
       JSON_Schema.Format.int(minimum = Some(0)))
+    val show_thy_arg = JSON_Schema.Arg.default("show_thy", "Status or nothing.",
+      JSON_Schema.Format.enumeration(PIDE_AI_Theory_Status.Statuses.Show.values
+        .filterNot(_ == PIDE_AI_Theory_Status.Statuses.Show.names)),
+      PIDE_AI_Theory_Status.Statuses.Show.not_ok)
     val show_ancestor_thys_arg = PIDE_AI_Tool_Schema.show_thy_statuses_arg(
       "show_ancestor_thys", PIDE_AI_Theory_Status.Statuses.Show.not_ok)
     val show_descendant_thys_arg = PIDE_AI_Tool_Schema.show_thy_statuses_arg(
@@ -81,15 +74,14 @@ object Get_State_Tool {
     def timeout_arg(default: Time, subtracted: String) = JSON_Schema.Arg.default(
       "timeout_ms", s"Max. wait. $subtracted time gets subtracted.",
       PIDE_AI_Tool_Schema.ms_format(0), default)
-    val progress_delay_arg = JSON_Schema.Arg.optional("progress_delay_ms",
-      s"Between reports. Default: $get_state_progress_delay_option.",
-      PIDE_AI_Tool_Schema.ms_format(0))
+    val progress_delay_arg = PIDE_AI_Tool_Schema.progress_delay_arg(progress_delay_option)
 
     def args(timeout_arg: JSON_Schema.Arg[Time]): List[JSON_Schema.Arg[?]] =
       List(summary_arg, PIDE_AI_Tool_Schema.long_running_arg, summary_problematic_limit_arg,
         snippet_lines_arg, details_arg, details_problematic_limit_arg,
-        details_unproblematic_limit_arg, show_ancestor_thys_arg, show_descendant_thys_arg,
-        show_other_cmds_running_arg, timeout_arg, stop_on_arg, progress_delay_arg,
+        details_unproblematic_limit_arg, show_thy_arg, show_ancestor_thys_arg,
+        show_descendant_thys_arg, show_other_cmds_running_arg, timeout_arg,
+        PIDE_AI_Tool_Schema.stop_on_arg, progress_delay_arg,
         PIDE_AI_Tool_Schema.disk_sync_arg)
 
     def from_json(args: JSON.Object.T, timeout_arg: JSON_Schema.Arg[Time]): Request = {
@@ -101,9 +93,10 @@ object Get_State_Tool {
           summary_problematic_limit_arg.get(args), snippet_lines_arg.get(args),
           details_arg.get(args).toSet, details_problematic_limit_arg.get(args),
           details_unproblematic_limit_arg.get(args)),
-        PIDE_AI_Tool_Schema.long_running_arg.get(args), show_ancestor_thys_arg.get(args),
-        show_descendant_thys_arg.get(args), show_other_cmds_running_arg.get(args),
-        timeout_arg.get(args), stop_on_arg.get(args), progress_delay_arg.get(args),
+        PIDE_AI_Tool_Schema.long_running_arg.get(args), show_thy_arg.get(args),
+        show_ancestor_thys_arg.get(args), show_descendant_thys_arg.get(args),
+        show_other_cmds_running_arg.get(args), timeout_arg.get(args),
+        PIDE_AI_Tool_Schema.stop_on_arg.get(args), progress_delay_arg.get(args),
         PIDE_AI_Tool_Schema.disk_sync_arg.get(args))
     }
   }
@@ -111,11 +104,12 @@ object Get_State_Tool {
   sealed case class Request(
     show: PIDE_AI_Document_Command.States.Show,
     long_running_threshold: Option[Time],
+    show_thy: PIDE_AI_Theory_Status.Statuses.Show,
     show_ancestor_thys: PIDE_AI_Theory_Status.Statuses.Show,
     show_descendant_thys: PIDE_AI_Theory_Status.Statuses.Show,
     show_other_cmds_running: Show_Other_Cmds_Running,
     timeout: Time,
-    stop_on: Stop_On,
+    stop_on: PIDE_AI_Tool_Util.Stop_On,
     progress_delay: Option[Time],
     sync: PIDE_AI_Tool_Util.Sync)
 
@@ -164,6 +158,9 @@ object Get_State_Tool {
             if (!statuses.exists(status => show.contains(status.overall_status))) JSON.Object.empty
             else PIDE_AI_Theory_Status.Statuses.json(resources, statuses, show, cwd)
         }
+      val thy = thys.map(view(PIDE_AI_Theory_Status.data, _))
+        .find(status => request.show_thy.contains(status.overall_status))
+        .map(_.json(resources.unicode_symbols, cwd))
       val ancestors = statuses_json(request.show_ancestor_thys,
         resources.known_dependency_closure(nodes, thys).toSet)
       val descendants = statuses_json(request.show_descendant_thys,
@@ -184,6 +181,7 @@ object Get_State_Tool {
         Option.when(blocked.nonEmpty)("blocked_by" -> JSON_Object(blocked.map((name, header) =>
           resources.print_node_name(name, cwd) ->
             header.errors.map(_.text(resources.unicode_symbols, cwd))))),
+        thy.map("thy" -> _),
         Option.when(ancestors.nonEmpty)("ancestors" -> ancestors),
         Option.when(descendants.nonEmpty)("descendants" -> descendants),
         Option.when(other_cmds_running.nonEmpty)(
@@ -198,9 +196,9 @@ object Get_State_Tool {
         (snapshot, statuses) => request.stop_on.stop(statuses) ||
           PIDE_AI_Nodes.blocked_by(resources, snapshot.switch(node_name)).nonEmpty,
         Some((request.timeout - (Time.now() - start)) max Time.zero),
-        get_state_delay(session.session_options), get_state_check_factor(session.session_options),
+        delay(session.session_options), wait_ratio(session.session_options),
         (snapshot, states) => json(snapshot, states.toList, 0, false),
-        request.progress_delay.getOrElse(get_state_progress_delay(session.session_options)),
+        request.progress_delay.getOrElse(progress_delay(session.session_options)),
         progress)
       json(snapshot, states.toList, edited, timed_out)
     }

@@ -40,7 +40,12 @@ object Edit_Tool {
         request.start_line, request.end_line)
       val range_text = search_range.substring(current_text)
       val old_text = request.old_text
-      val new_text = request.new_text
+      val text = request.new_text
+      val new_text =
+        if (old_text.nonEmpty || text.isEmpty || text.endsWith("\n")) text
+        else if (range_text.endsWith("\n") || request.mode == Mode.prepend) text + "\n"
+        else if (request.mode == Mode.append && range_text.nonEmpty) "\n" + text
+        else text
       val actual_old_text = if (old_text.isEmpty) range_text else old_text
       val offsets = if (old_text.isEmpty) List(search_range.start)
         else {
@@ -92,7 +97,7 @@ object Edit_Tool {
   val text_arg = JSON_Schema.Arg.required(
     "text", "Text to write.", JSON_Schema.Format.string)
   val old_text_arg = JSON_Schema.Arg.required(
-    "old_text", "Text to find. If empty, whole text in range is selected.",
+    "old_text", "Text to find. If empty, all lines in range are selected.",
     JSON_Schema.Format.string)
   val edit_all_arg = JSON_Schema.Arg.default(
     "edit_all", "Edit every match or a unique occurrence.", JSON_Schema.Format.bool,

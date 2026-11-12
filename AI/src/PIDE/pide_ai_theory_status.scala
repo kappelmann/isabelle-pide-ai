@@ -41,14 +41,17 @@ object PIDE_AI_Theory_Status {
           PIDE_AI_Command_Status.command_status(snapshot, command).timings.count_finished
         percent(processed, command.span.theory_commands)
     }
-    val overall_status = if (!consolidated) Document_Status.Overall_Status.pending
+    val missing_end = total > 0 && !Document_Status.Theory_Status.finalized(theory_status) &&
+      counts(PIDE_AI_Command_Status.finished) == total
+    val overall_status = if (missing_end) Document_Status.Overall_Status.failed
+      else if (!consolidated) Document_Status.Overall_Status.pending
       else if (counts(PIDE_AI_Command_Status.failed) == 0)
         Document_Status.Overall_Status.ok
       else Document_Status.Overall_Status.failed
     val header_errors =
       PIDE_AI_Nodes.failed_header_state(snapshot.switch(name)).toList.flatMap(_.errors)
     PIDE_AI_Theory_Status(name, overall_status, finished_ms, running_timings.result(), percentage,
-      header_errors, counts.toMap)
+      header_errors, missing_end, counts.toMap)
   }
 
   val data: PIDE_AI_Node_Cache.Data[PIDE_AI_Theory_Status] =
@@ -109,6 +112,7 @@ sealed case class PIDE_AI_Theory_Status(
   running_timings: List[Document_Status.Command_Timings],
   percentage: Int,
   header_errors: List[PIDE_AI_Message],
+  missing_end: Boolean,
   counts: Map[PIDE_AI_Command_Status, Int]
 ) {
   def timing_ms: Long = {
@@ -126,8 +130,8 @@ sealed case class PIDE_AI_Theory_Status(
       Some("status" -> overall_status.toString),
       Some("timing_ms" -> timing_ms),
       Option.when(percentage < 100)("percent_processed" -> percentage)) ++
-    JSON.optional("header_errors" ->
-      proper_list(header_errors.map(_.text(unicode_symbols, cwd)))) ++
+    JSON.optional("thy_errors" -> proper_list(header_errors.map(_.text(unicode_symbols, cwd)) :::
+      (if (missing_end) List("Malformed theory: missing end.") else Nil))) ++
     JSON_Object(PIDE_AI_Command_Status.values.toList
       .flatMap(status => counts.get(status).map(
         PIDE_AI_Document_Command.States.cmds_key(status.name) -> _)))

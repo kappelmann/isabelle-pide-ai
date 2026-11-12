@@ -84,9 +84,10 @@ class PIDE_AI_Query(
     timeout: Option[Time] = None,
     stop: Editor.Output => Boolean = _ => false
   ): PIDE_AI_Query.Result = {
-    if (session.resources.is_base_session_theory(context.node_name))
-      error(s"Cannot query base session theory $node")
-    if (editor.current_command(context, require_snapshot()).isEmpty)
+    val snapshot = require_snapshot()
+    if (!session.resources.is_loaded_dynamic_node(snapshot.version.nodes, context.node_name))
+      error(s"Cannot query $node: not a dynamic node")
+    if (editor.current_command(context, snapshot).isEmpty)
       error(s"No command at the given position of $node")
 
     val start = Time.now()
