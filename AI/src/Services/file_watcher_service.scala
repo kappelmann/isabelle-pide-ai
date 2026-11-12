@@ -31,7 +31,10 @@ with Session_Data_Service[File_Watcher_Service.Data] {
     }
 
     def sync(changed: List[Document.Node.Name]): Unit =
-      try { session.sync_loaded_resolve(changed, progress) }
+      try {
+        session.resources.sync_nodes_load_missing(session, changed.map(_ -> None),
+          hide_others = false, progress)
+      }
       catch {
         case exn @ Exn.Interrupt() =>
           if (!progress.stopped) log.error_message(s"${quote(name)} interrupted")

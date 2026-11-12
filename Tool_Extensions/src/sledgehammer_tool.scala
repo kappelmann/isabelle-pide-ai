@@ -66,7 +66,7 @@ class Sledgehammer_Tool extends PIDE_AI_Tool("sledgehammer") with PIDE_AI_Tool.R
       val session = PIDE_AI_Tool_Util.running_session_param(server.sessions, args)
       val node_name = PIDE_AI_Tool_Util.node_param(session, args, cwd)
       val snapshot =
-        PIDE_AI_Tool_Util.require_stable_synced_node_snapshot(session, node_name,
+        PIDE_AI_Tool_Util.sync_load_missing_stable_node_snapshot(session, node_name,
           PIDE_AI_Tool_Schema.disk_sync_arg.get(args), progress, cwd)
       val line = line_arg.get(args)
       val editor_context = PIDE_AI_Editor.Context(node_name,

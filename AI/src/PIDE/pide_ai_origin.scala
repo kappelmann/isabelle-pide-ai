@@ -37,7 +37,8 @@ object PIDE_AI_Origin {
   ) {
     private val docs = mutable.Map.empty[Document.Node.Name, Line.Document]
     def doc(node_name: Document.Node.Name): Line.Document =
-      docs.getOrElseUpdate(node_name, Line.Document(session.node_source(snapshot, node_name)))
+      docs.getOrElseUpdate(node_name,
+        Line.Document(session.resources.node_source(snapshot.version.nodes, node_name)))
 
     private val snippets = mutable.Map.empty[(Document.Node.Name, Int), String]
     def snippet(node_name: Document.Node.Name, line: Int): String =

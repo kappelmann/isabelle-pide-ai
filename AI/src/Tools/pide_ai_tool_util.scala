@@ -47,56 +47,62 @@ object PIDE_AI_Tool_Util {
         this == any_failed && statuses.exists(_.count(PIDE_AI_Command_Status.failed) > 0)
   }
 
-  def stable_synced(
+  def sync(
     session: PIDE_AI_Session,
     node_names: List[Document.Node.Name],
     sync: Sync,
     progress: PIDE_AI_Progress
-  ): Unit = {
-    val change = sync match {
-      case Sync.none => session.resolve_dependencies(node_names, progress)
-      case Sync.node => session.sync_resolve(node_names, progress)
+  ): Unit =
+    sync match {
+      case Sync.none =>
+      case Sync.node =>
+        session.resources.sync_nodes(session, node_names.map(_ -> None), hide_others = false,
+          progress)
+      case Sync.node_and_ancestors =>
+        session.resources.sync(session, node_names.map(_ -> None), hide_others = false, progress)
+    }
+
+  def sync_load_missing_nodes(
+    session: PIDE_AI_Session,
+    nodes: List[(Document.Node.Name, Option[List[(Int, Option[Int])]])],
+    sync: Sync,
+    hide_others: Boolean,
+    progress: PIDE_AI_Progress
+  ): (Map[Document.Node.Name, String], Document.Change) =
+    sync match {
+      case Sync.none =>
+        session.resources.load_missing_nodes(session, nodes, hide_others, progress)
+      case Sync.node => session.resources.load_nodes(session, nodes, hide_others, progress)
       case Sync.node_and_ancestors =>
         session.with_lock(progress) {
-          session.sync_resolve(session.resources.known_dependency_closure(
-            session.tip_version(progress).nodes, node_names), progress)
+          PIDE_AI_Tool_Util.sync(session, nodes.map(_._1), sync, progress)
+          session.resources.load_missing_nodes(session, nodes, hide_others, progress)
         }
     }
-    session.await_stable(change, progress)
-  }
 
-  def require_node_snapshot(
+  def sync_load_missing(
     session: PIDE_AI_Session,
-    node_name: Document.Node.Name,
-    progress: PIDE_AI_Progress,
-    cwd: Option[Path]
-  ): Document.Snapshot = {
-    def node = quote(session.resources.print_node_name(node_name, cwd))
-    val snapshot = try { session.node_snapshot(node_name) } catch {
-      case ERROR(_) =>
-        if (session.resources.is_loaded_node(session.tip_version(progress).nodes, node_name))
-          error(s"The node $node is loaded but has not been processed yet. " +
-            retry_soon_message)
-        else {
-          session.read_update_resolve(node_name, Nil,
-            await_stable_before_resolve = false, hide_others = false, progress = progress)
-          error(s"The node $node was not loaded and has now been queued for loading. " +
-            retry_soon_message)
-        }
+    node_names: List[Document.Node.Name],
+    sync: Sync,
+    progress: PIDE_AI_Progress
+  ): Document.Change =
+    session.with_lock(progress) {
+      PIDE_AI_Tool_Util.sync(session, node_names, sync, progress)
+      session.resources.load_missing(session, node_names, progress)
     }
-    if (PIDE_AI_Nodes.node_theory(snapshot.version.nodes, node_name).isEmpty)
-      error(s"File $node is not loaded by any theory. Load the containing theory first.")
-    snapshot
-  }
 
-  def require_stable_synced_node_snapshot(
+  def sync_load_missing_stable_node_snapshot(
     session: PIDE_AI_Session,
     node_name: Document.Node.Name,
     sync: Sync,
     progress: PIDE_AI_Progress,
     cwd: Option[Path]
   ): Document.Snapshot = {
-    stable_synced(session, List(node_name), sync, progress)
-    require_node_snapshot(session, node_name, progress, cwd)
+    session.await_stable(sync_load_missing(session, List(node_name), sync, progress), progress)
+    val snapshot = session.node_snapshot(node_name)
+    if (PIDE_AI_Nodes.node_theory(snapshot.version.nodes, node_name).isEmpty)
+      error("File " + quote(session.resources.print_node_name(node_name, cwd)) +
+        " is not loaded by any theory. Load the containing theory first.")
+    snapshot
   }
 }

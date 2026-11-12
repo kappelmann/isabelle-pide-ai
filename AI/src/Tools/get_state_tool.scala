@@ -113,7 +113,7 @@ object Get_State_Tool {
     progress_delay: Option[Time],
     sync: PIDE_AI_Tool_Util.Sync)
 
-  def state(
+  def sync_load_state(
     session: PIDE_AI_Session,
     node_name: Document.Node.Name,
     start_line: Int,
@@ -123,7 +123,7 @@ object Get_State_Tool {
     progress: PIDE_AI_Progress,
     cwd: Option[Path]
   ): JSON.Object.T = {
-    val snapshot0 = PIDE_AI_Tool_Util.require_stable_synced_node_snapshot(
+    val snapshot0 = PIDE_AI_Tool_Util.sync_load_missing_stable_node_snapshot(
       session, node_name, request.sync, progress, cwd)
     val range = PIDE_AI_Util.check_text_range(
       Line.Document(snapshot0.node.source), start_line, opt_end_line)
@@ -227,7 +227,7 @@ class Get_State_Tool extends PIDE_AI_Tool("get_state") with PIDE_AI_Tool.Read_On
       val start = Time.now()
       val session = PIDE_AI_Tool_Util.running_session_param(server.sessions, args)
       val node_name = PIDE_AI_Tool_Util.node_param(session, args, context.cwd)
-      Get_State_Tool.state(session, node_name,
+      Get_State_Tool.sync_load_state(session, node_name,
         PIDE_AI_Tool_Schema.start_line_default_arg.get(args),
         PIDE_AI_Tool_Schema.opt_end_line_arg.get(args),
         Get_State_Tool.Request.from_json(args, timeout_arg), start, progress, context.cwd)

@@ -9,6 +9,8 @@ New in this PIDE AI version
 New in PIDE AI 2026
 ----------------------------
 
+* `read`, `edit`, and `edit_get_state` now take optional `disk_sync` mode.
+* `PIDE_AI_Session` now works in memory only, loading and syncing from disk moved to `PIDE_AI_Resources`. INCOMPATIBILITY.
 * `get_session_state` can now wait for termination or failure via `timeout_ms`.
 * Deleted or renamed files remain addressable by their old path, e.g. to unload them.
 * Malformed tool arguments report their expected schema.

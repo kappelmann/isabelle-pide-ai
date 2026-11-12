@@ -24,9 +24,10 @@ object Edit_Tool {
     start_line: Int,
     end_line: Option[Int],
     old_text: String,
-    edit_all: Boolean)
+    edit_all: Boolean,
+    sync: PIDE_AI_Tool_Util.Sync)
 
-  def edit(
+  def load_edit(
     session: PIDE_AI_Session,
     node_name: Document.Node.Name,
     request: Request,
@@ -34,8 +35,8 @@ object Edit_Tool {
   ): List[(Int, Int)] = {
     PIDE_AI_Util.check_ordered_lines(request.start_line, request.end_line)
     session.with_lock(progress) {
-      val current_text = session.read_update(
-        List(node_name -> None), hide_others = false, progress = progress)._1(node_name)
+      val current_text = PIDE_AI_Tool_Util.sync_load_missing_nodes(session,
+        List(node_name -> None), request.sync, hide_others = false, progress)._1(node_name)
       val search_range = PIDE_AI_Util.check_text_range(Line.Document(current_text),
         request.start_line, request.end_line)
       val range_text = search_range.substring(current_text)
@@ -77,13 +78,13 @@ object Edit_Tool {
       }
       progress.expose_interrupt()
       if (changed) session.resources.write_file_content(node_name.path, computed_text)
-      val (_, change) = session.read_update(
+      val (_, change) = session.resources.load_nodes(session,
         List(node_name -> Some(edited_lines.map(_ -> Some(_)))),
         hide_others = true,
         // avoid disk <--> PIDE disagreement
-        progress = new Unstoppable_Progress(progress))
+        new Unstoppable_Progress(progress))
       session.await_stable(change, progress)
-      session.resolve_dependencies(List(node_name), progress)
+      session.resources.load_missing(session, List(node_name), progress)
       if (changed) edited_lines else Nil
     }
   }
@@ -111,10 +112,11 @@ object Edit_Tool {
     PIDE_AI_Tool_Schema.start_line_default_arg, PIDE_AI_Tool_Schema.opt_end_line_arg,
     old_text_arg, edit_all_arg, show_edited_lines_arg)
 
-  def read_update_edit(
+  def load_edit_json(
     session: PIDE_AI_Session,
     node_name: Document.Node.Name,
     args: JSON.Object.T,
+    sync: PIDE_AI_Tool_Util.Sync,
     progress: PIDE_AI_Progress
   ): (List[(Int, Int)], JSON.Object.T) = {
     def pide_text(arg: JSON_Schema.Arg[String]): String =
@@ -122,9 +124,9 @@ object Edit_Tool {
     val request = Request(mode_arg.get(args), pide_text(text_arg),
       PIDE_AI_Tool_Schema.start_line_default_arg.get(args),
       PIDE_AI_Tool_Schema.opt_end_line_arg.get(args), pide_text(old_text_arg),
-      edit_all_arg.get(args))
+      edit_all_arg.get(args), sync)
     val show_edited_lines = show_edited_lines_arg.get(args)
-    val edited_lines = edit(session, node_name, request, progress)
+    val edited_lines = load_edit(session, node_name, request, progress)
     val shown_lines = show_edited_lines match {
       case Edited_Lines.none => None
       case Edited_Lines.bounding_box => PIDE_AI_Util.line_ranges_span(edited_lines)
@@ -142,9 +144,10 @@ class Edit_Tool extends PIDE_AI_Tool("edit") with PIDE_AI_Tool.Destructive {
   def description: String =
     Edit_Tool.base_description + " " + PIDE_AI_Tool_Schema.range_perspective + " " +
     PIDE_AI_Tool_Schema.no_processing_wait + " " +
-    PIDE_AI_Tool_Schema.implicit_load_files + " " + PIDE_AI_Tool_Schema.implicit_sync
+    PIDE_AI_Tool_Schema.implicit_load_files
 
-  def input_schema: JSON.Object.T = JSON_Schema.object_schema(Edit_Tool.edit_args)
+  def input_schema: JSON.Object.T =
+    JSON_Schema.object_schema(Edit_Tool.edit_args :+ PIDE_AI_Tool_Schema.node_disk_sync_arg)
 
   def handle(
     server: PIDE_AI_Server,
@@ -155,7 +158,8 @@ class Edit_Tool extends PIDE_AI_Tool("edit") with PIDE_AI_Tool.Destructive {
     PIDE_AI_Tool_Result.result {
       val session = PIDE_AI_Tool_Util.running_session_param(server.sessions, args)
       val node_name = PIDE_AI_Tool_Util.node_param(session, args, context.cwd)
-      Edit_Tool.read_update_edit(session, node_name, args, progress)._2
+      Edit_Tool.load_edit_json(session, node_name, args,
+        PIDE_AI_Tool_Schema.node_disk_sync_arg.get(args), progress)._2
     }
 }
 

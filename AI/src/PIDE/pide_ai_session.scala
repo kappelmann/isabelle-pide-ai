@@ -7,7 +7,6 @@ package isabelle.pide.ai
 import isabelle._
 import isabelle.symbols.Symbols
 
-import scala.annotation.tailrec
 import scala.collection.immutable.Queue
 
 object PIDE_AI_Session {
@@ -234,14 +233,7 @@ class PIDE_AI_Session private(
         version.peek.map(Exn.release))
   }
 
-  def node_source(
-    snapshot: Document.Snapshot,
-    node_name: Document.Node.Name
-  ): String =
-    try { switch(snapshot, node_name).node.source }
-    catch { case ERROR(_) => resources.read_file_content(node_name) }
-
-  def update(nodes: Document.Nodes, edits: List[Document.Edit_Text]): Document.Change = {
+  def update_edits(nodes: Document.Nodes, edits: List[Document.Edit_Text]): Document.Change = {
     if (edits.nonEmpty) {
       val loaded_blobs = nodes.iterator.flatMap { (name, node) =>
         node.get_blob.filter(_ => resources.is_loaded_node(nodes, name)).map(name -> _) }
@@ -263,7 +255,7 @@ class PIDE_AI_Session private(
         val nodes = tip_version(progress).nodes
         val node = nodes(node_name)
         if (resources.is_loaded_dynamic_thy(nodes, node_name))
-          update(nodes, List(node_name -> PIDE_AI_Document_Model.node_perspective(node)
+          update_edits(nodes, List(node_name -> PIDE_AI_Document_Model.node_perspective(node)
             .copy(overlays = change(node.perspective.overlays))))
         else if (require_theory)
           error(quote(resources.print_node_name(node_name, None)) + " is not a dynamic theory")
@@ -302,88 +294,26 @@ class PIDE_AI_Session private(
 
   def editor(progress: PIDE_AI_Progress): PIDE_AI_Editor = new PIDE_AI_Editor(this, progress)
 
-  def read_update(
-    nodes: List[(Document.Node.Name, Option[List[(Int, Option[Int])]])],
+  def update(
+    nodes: List[(Document.Node.Name, String, Option[List[(Int, Option[Int])]])],
     hide_others: Boolean,
-    progress: PIDE_AI_Progress,
-    sync: Boolean = true
-  ): (Map[Document.Node.Name, String], Document.Change) = {
-    val (models, change) = with_lock(progress) {
+    progress: PIDE_AI_Progress
+  ): Document.Change =
+    with_lock(progress) {
       val version = tip_version(progress)
-      val models1 = nodes.map { (name, visible_lines) =>
+      val models = nodes.map { (name, text, visible_lines) =>
         val node = version.nodes(name)
-        val text = if (!sync && resources.is_loaded_node(version.nodes, name)) node.source
-          else resources.read_file_content(name)
+        if (!node.is_empty && node.get_blob.isDefined == name.is_theory)
+          error(quote(resources.print_node_name(name, None)) +
+            " cannot be used as a blob and a theory within one session. " +
+            "Restart the session if required.")
         PIDE_AI_Document_Model.make(this, name, node, text, visible_lines,
           PIDE_AI_Session.range_context(session_options))
       }
       val other_edits = if (!hide_others) Nil
         else PIDE_AI_Document_Model.hide_edits(version.nodes, nodes.map(_._1).toSet)
-      (models1, update(version.nodes, other_edits ::: models1.flatMap(_.edits)))
+      update_edits(version.nodes, other_edits ::: models.flatMap(_.edits))
     }
-    (models.map(model => model.node_name -> model.text).toMap, change)
-  }
-
-  def sync(
-    node_names: List[Document.Node.Name],
-    progress: PIDE_AI_Progress
-  ): (Map[Document.Node.Name, String], Document.Change) =
-    with_lock(progress) {
-      val nodes = tip_version(progress).nodes
-      read_update(
-        node_names.filter(resources.is_loaded_node(nodes, _)).map(_ -> None),
-        hide_others = false, progress = progress)
-    }
-
-  def sync_resolve(
-    node_names: List[Document.Node.Name],
-    progress: PIDE_AI_Progress
-  ): Document.Change =
-    with_lock(progress) {
-      sync(node_names, progress)
-      resolve_dependencies(node_names, progress)
-    }
-
-  def sync_loaded_resolve(
-    node_names: List[Document.Node.Name],
-    progress: PIDE_AI_Progress
-  ): Document.Change =
-    with_lock(progress) {
-      val (texts, _) = sync(node_names, progress)
-      resolve_dependencies(texts.keys.toList, progress)
-      tip_change
-    }
-
-  def read_update_resolve(
-    node_name: Document.Node.Name,
-    visible_lines: List[(Int, Option[Int])],
-    await_stable_before_resolve: Boolean,
-    hide_others: Boolean,
-    progress: PIDE_AI_Progress,
-    sync: Boolean = true
-  ): String = {
-    val (texts, change) =
-      read_update(List(node_name -> Some(visible_lines)), hide_others, progress, sync = sync)
-    if (await_stable_before_resolve) await_stable(change, progress)
-    resolve_dependencies(List(node_name), progress)
-    texts(node_name)
-  }
-
-  def resolve_dependencies(
-    node_names: List[Document.Node.Name],
-    progress: PIDE_AI_Progress
-  ): Document.Change = {
-    @tailrec def loop(seen: Set[Document.Node.Name], node_names: List[Document.Node.Name]): Unit = {
-      val names =
-        resources.nodes_to_load(conditions, tip_version(progress).nodes, node_names, seen, progress)
-      if (names.nonEmpty) {
-        read_update(names.map(_ -> Some(Nil)), hide_others = false, progress = progress)
-        loop(seen ++ names, names)
-      }
-    }
-    loop(Set.empty, node_names)
-    tip_change
-  }
 
   def unload(
     node_names: List[Document.Node.Name],
@@ -401,9 +331,9 @@ class PIDE_AI_Session private(
             s"Unload $theories instead.")
         }
       }
-      update(nodes, unloaded.flatMap(name =>
+      update_edits(nodes, unloaded.flatMap(name =>
         PIDE_AI_Document_Model.unload_edits(this, name, nodes(name))))
-      (unloaded, update(tip_version(progress).nodes, unloaded.filter(_.is_theory).map(
+      (unloaded, update_edits(tip_version(progress).nodes, unloaded.filter(_.is_theory).map(
         _ -> Document.Node.Thy(Resources.Thy.empty))))
     }
   }

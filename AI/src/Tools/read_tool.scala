@@ -14,7 +14,7 @@ class Read_Tool extends PIDE_AI_Tool("read") {
   def input_schema: JSON.Object.T = JSON_Schema.object_schema(
     List(PIDE_AI_Tool_Schema.running_session_arg, PIDE_AI_Tool_Schema.node_arg,
       PIDE_AI_Tool_Schema.start_line_default_arg, PIDE_AI_Tool_Schema.opt_end_line_arg,
-      PIDE_AI_Tool_Schema.disk_sync_arg))
+      PIDE_AI_Tool_Schema.node_disk_sync_arg))
 
   def handle(
     server: PIDE_AI_Server,
@@ -28,13 +28,12 @@ class Read_Tool extends PIDE_AI_Tool("read") {
       val start_line = PIDE_AI_Tool_Schema.start_line_default_arg.get(args)
       val opt_end_line = PIDE_AI_Tool_Schema.opt_end_line_arg.get(args)
       PIDE_AI_Util.check_ordered_lines(start_line, opt_end_line)
-      val sync = PIDE_AI_Tool_Schema.disk_sync_arg.get(args)
-      if (sync == PIDE_AI_Tool_Util.Sync.node_and_ancestors)
-        PIDE_AI_Tool_Util.stable_synced(session, List(node_name), sync, progress)
-      val text = session.read_update_resolve(node_name, List((start_line, opt_end_line)),
-        await_stable_before_resolve = true, hide_others = true, progress = progress,
-        sync = sync == PIDE_AI_Tool_Util.Sync.node)
-      val doc = Line.Document(text)
+      val nodes = List(node_name -> Some(List((start_line, opt_end_line))))
+      val (sources, change) = PIDE_AI_Tool_Util.sync_load_missing_nodes(session, nodes,
+        PIDE_AI_Tool_Schema.node_disk_sync_arg.get(args), hide_others = true, progress)
+      session.await_stable(change, progress)
+      session.resources.load_missing(session, List(node_name), progress)
+      val doc = Line.Document(sources(node_name))
       val (_, end_line) = PIDE_AI_Util.check_lines(start_line, opt_end_line, doc.lines.length)
       PIDE_AI_Util.numbered_lines_range(doc, start_line, end_line)
     }

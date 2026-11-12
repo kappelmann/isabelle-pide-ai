@@ -66,7 +66,7 @@ class Ranged_Origins_Tool extends PIDE_AI_Tool("ranged_origins") with PIDE_AI_To
       val session = PIDE_AI_Tool_Util.running_session_param(server.sessions, args)
       val node_name = PIDE_AI_Tool_Util.node_param(session, args, cwd)
       val snapshot =
-        PIDE_AI_Tool_Util.require_stable_synced_node_snapshot(session, node_name,
+        PIDE_AI_Tool_Util.sync_load_missing_stable_node_snapshot(session, node_name,
           PIDE_AI_Tool_Schema.disk_sync_arg.get(args), progress, cwd)
       val snippet_lines = snippet_lines_arg.get(args)
       val filter_node_names = located_in_arg.get(args).map { names =>

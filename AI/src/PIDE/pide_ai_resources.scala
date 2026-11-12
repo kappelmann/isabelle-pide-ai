@@ -127,12 +127,112 @@ class PIDE_AI_Resources(
     if (Symbols.supports_isabelle_symbols(path)) Symbol.output(unicode_symbols_disk, text)
     else text
 
-  def read_file_content(node_name: Document.Node.Name): String =
+  def disk_node_source(node_name: Document.Node.Name): String =
     make_theory_content(node_name).getOrElse(
       pide_text(node_name.path, Line.normalize(File.read(node_name.path))))
 
   def write_file_content(path: Path, text: String): Unit =
     File.write(path, disk_text(path, Line.normalize(text)))
+
+  def node_source(nodes: Document.Nodes, node_name: Document.Node.Name): String =
+    if (is_loaded_node(nodes, node_name)) nodes(node_name).source
+    else disk_node_source(node_name)
+
+  def update_sources(
+    session: PIDE_AI_Session,
+    nodes: List[(Document.Node.Name, Option[List[(Int, Option[Int])]])],
+    hide_others: Boolean,
+    progress: PIDE_AI_Progress
+  )(source: (Document.Nodes, Document.Node.Name) => String
+  ): (Map[Document.Node.Name, String], Document.Change) =
+    session.with_lock(progress) {
+      val version_nodes = session.tip_version(progress).nodes
+      val sources = nodes.map((name, visible_lines) =>
+        (name, source(version_nodes, name), visible_lines))
+      (sources.map((name, source, _) => name -> source).toMap,
+        session.update(sources, hide_others, progress))
+    }
+
+  def load_nodes(
+    session: PIDE_AI_Session,
+    nodes: List[(Document.Node.Name, Option[List[(Int, Option[Int])]])],
+    hide_others: Boolean,
+    progress: PIDE_AI_Progress
+  ): (Map[Document.Node.Name, String], Document.Change) =
+    update_sources(session, nodes, hide_others, progress)((_, name) => disk_node_source(name))
+
+  def load_missing_nodes(
+    session: PIDE_AI_Session,
+    nodes: List[(Document.Node.Name, Option[List[(Int, Option[Int])]])],
+    hide_others: Boolean,
+    progress: PIDE_AI_Progress
+  ): (Map[Document.Node.Name, String], Document.Change) =
+    update_sources(session, nodes, hide_others, progress)(node_source)
+
+  def load_missing(
+    session: PIDE_AI_Session,
+    node_names: List[Document.Node.Name],
+    progress: PIDE_AI_Progress
+  ): Document.Change = {
+    @tailrec def loop(seen: Set[Document.Node.Name], node_names: List[Document.Node.Name]): Unit = {
+      val names = nodes_to_load(session.conditions, session.tip_version(progress).nodes,
+        node_names, seen, progress)
+      if (names.nonEmpty) {
+        load_nodes(session, names.map(_ -> Some(Nil)), hide_others = false, progress)
+        loop(seen ++ names, names)
+      }
+    }
+    loop(Set.empty, node_names)
+    session.tip_change
+  }
+
+  def load(
+    session: PIDE_AI_Session,
+    nodes: List[(Document.Node.Name, Option[List[(Int, Option[Int])]])],
+    hide_others: Boolean,
+    progress: PIDE_AI_Progress
+  ): Map[Document.Node.Name, String] = {
+    val (sources, _) = load_nodes(session, nodes, hide_others, progress)
+    load_missing(session, nodes.map(_._1), progress)
+    sources
+  }
+
+  def sync_nodes(
+    session: PIDE_AI_Session,
+    nodes: List[(Document.Node.Name, Option[List[(Int, Option[Int])]])],
+    hide_others: Boolean,
+    progress: PIDE_AI_Progress
+  ): List[Document.Node.Name] =
+    session.with_lock(progress) {
+      val version_nodes = session.tip_version(progress).nodes
+      val loaded = nodes.filter((name, _) => is_loaded_node(version_nodes, name))
+      load_nodes(session, loaded, hide_others, progress)
+      loaded.map(_._1)
+    }
+
+  def sync(
+    session: PIDE_AI_Session,
+    nodes: List[(Document.Node.Name, Option[List[(Int, Option[Int])]])],
+    hide_others: Boolean,
+    progress: PIDE_AI_Progress
+  ): List[Document.Node.Name] =
+    session.with_lock(progress) {
+      val visible_lines = nodes.toMap
+      val closure = known_dependency_closure(session.tip_version(progress).nodes, nodes.map(_._1))
+      sync_nodes(session, closure.map(name => name -> visible_lines.getOrElse(name, None)),
+        hide_others, progress)
+    }
+
+  def sync_nodes_load_missing(
+    session: PIDE_AI_Session,
+    nodes: List[(Document.Node.Name, Option[List[(Int, Option[Int])]])],
+    hide_others: Boolean,
+    progress: PIDE_AI_Progress
+  ): Document.Change =
+    session.with_lock(progress) {
+      val synced = sync_nodes(session, nodes, hide_others, progress)
+      load_missing(session, synced, progress)
+    }
 
   def print_node_name(node_name: Document.Node.Name, cwd: Option[Path]): String =
     // roundtrip-property
