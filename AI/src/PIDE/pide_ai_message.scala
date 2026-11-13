@@ -39,7 +39,7 @@ object PIDE_AI_Message {
     cwd: Option[Path]
   ): XML.Elem =
     XML.Elem(msg.markup, msg match {
-        case Protocol.ML_Profiling(report) => XML.string(report.print)
+        case Protocol.ML_Profiling(_, report) => XML.string(report.print())
         case _ => PIDE_AI_Document_Command.resolve_positions(snapshot, cmd, msg.body, cwd)
       })
 

@@ -137,7 +137,7 @@ class PIDE_AI_Session private(
   def progress_delay: Time = PIDE_AI_Session.progress_delay(session_options)
   def long_running_threshold: Time = PIDE_AI_Session.long_running_threshold(session_options)
 
-  def base_session: String = resources.current_background.session_name
+  def base_session: String = resources.session_name
   def directories(): List[Path] = Sessions.directories(dirs, Nil).map(_._2)
 
   private val lock = new Queue_Lock

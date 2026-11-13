@@ -26,7 +26,7 @@ object PIDE_AI_Session_Spec {
     -o OPTION    override Isabelle system OPTION (via NAME=VAL or NAME)
     -z ID        PIDE AI session id
 """
-  private object Parsers extends Scan.Parsers {
+  private object Scanners extends Scan.Scanners {
     val blanks: Parser[String] = many(character(Symbol.is_ascii_blank))
     val word: Parser[String] = quoted("\"") ^^ (s => quoted_content("\"", s))
       | many1(sym => sym != "\"" && !character(Symbol.is_ascii_blank)(sym))
@@ -57,8 +57,8 @@ object PIDE_AI_Session_Spec {
   }
 
   def parse(spec: String, cwd: Option[Path]): PIDE_AI_Session_Spec = {
-    val words = Parsers.parseAll(Parsers.words, spec) match {
-      case Parsers.Success(res, _) => res
+    val words = Scanners.parseAll(Scanners.words, spec) match {
+      case Scanners.Success(res, _) => res
       case bad => cat_error(bad.toString, usage)
     }
     val builder = new Builder

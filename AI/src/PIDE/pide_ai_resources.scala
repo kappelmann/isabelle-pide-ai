@@ -263,18 +263,18 @@ class PIDE_AI_Resources(
   }
 
   def disk_dependency_closure(
-    conditions: Thy_Conditions.Context,
+    conditions: Thy_Conditions.State,
     names: List[Document.Node.Name],
     progress: PIDE_AI_Progress
   ): List[Document.Node.Name] = {
     val deps = dependencies(conditions,
       names.filter(_.is_theory).map((_, Position.none)), progress = progress)
     val blobs = try deps.loaded_files catch { case ERROR(_) => Nil }
-    (names ::: deps.theories ::: blobs).distinct
+    (names ::: deps.theories.map(_.name) ::: blobs).distinct
   }
 
   def nodes_to_load(
-    conditions: Thy_Conditions.Context,
+    conditions: Thy_Conditions.State,
     nodes: Document.Nodes,
     node_names: List[Document.Node.Name],
     exclude: Set[Document.Node.Name],
@@ -291,7 +291,6 @@ class PIDE_AI_Resources(
     nodes: Document.Nodes,
     names: List[Document.Node.Name]
   ): List[Document.Node.Name] = {
-    val loaded_theories = current_background.base.loaded_theories
     val import_names =
       loaded_theories.all_succs(names.filter(is_base_session_thy).map(_.theory))
         .map(Document.Node.Name.loaded_theory)

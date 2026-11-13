@@ -95,8 +95,8 @@ sealed case class PIDE_AI_Document_Model(
 
   def get_blob: Option[Document.Blobs.Item] =
     if (is_theory) None
-    else Some(Document.Blobs.Item(
-      Bytes(Symbol.encode(text)), text, Symbol.Text_Chunk(text), changed = !is_stable))
+    else Some(Document.Blobs.Item.make(
+      Bytes(Symbol.encode(text)), source = Some(text), changed = !is_stable))
 
   def get_thy(): Resources.Thy = {
     val thy0 = session.resources.special_thy(node_name).getOrElse(
