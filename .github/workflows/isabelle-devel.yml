@@ -1,0 +1,33 @@
+name: Isabelle development compatibility
+
+on:
+  schedule:
+    - cron: '23 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out PIDE AI main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: pide-ai
+
+      - name: Clone latest Isabelle development
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mercurial
+          hg clone -u tip https://isabelle.in.tum.de/repos/isabelle isabelle
+
+      - name: Compile PIDE AI, MCP, and tool extensions
+        run: |
+          isabelle/Admin/init -n
+          isabelle/bin/isabelle components -u "$GITHUB_WORKSPACE/pide-ai"
+          isabelle/bin/isabelle components -u "$GITHUB_WORKSPACE/pide-ai/Tool_Extensions"
+          isabelle/bin/isabelle scala_build
