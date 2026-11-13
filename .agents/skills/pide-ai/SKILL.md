@@ -26,5 +26,5 @@ Paths are relative to a working directory (MCP: dir at connection, CLI: CWD).
 - A theory status ok means all commands finished without errors. It may still contain sorrys (reported as bad, not as errors), proofs aborted with oops (not reported), and warnings.
 - Errors appear in two forms: error messages and failed commands. A failed command might not have an error message.
 - Request only information you need and set limits: details for a whole theory flood your context.
-- Only commands in the PIDE perspective run automatically tried tools (e.g. quickcheck, solve_direct).
+- Only commands in the visible PIDE perspective run automatically tried tools (e.g. quickcheck, solve_direct).
 - Isar diagnostic commands (try0, print_facts, find_theorems,...): their output appears as info in get_state.

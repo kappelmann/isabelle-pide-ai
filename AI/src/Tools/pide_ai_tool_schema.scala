@@ -10,7 +10,7 @@ import isabelle._
 
 object PIDE_AI_Tool_Schema {
   val implicit_load_files: String = "Loads files if needed."
-  val range_perspective: String = "Moves PIDE perspective to range."
+  val range_perspective: String = "Moves visible PIDE perspective to range."
   val no_processing_wait: String = "Does not wait for commands to terminate."
 
   val running_session_arg = JSON_Schema.Arg.optional(
