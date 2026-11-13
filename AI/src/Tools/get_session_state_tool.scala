@@ -43,7 +43,8 @@ object Get_Session_State_Tool {
       JSON_Schema.Format.bool, false)
     val timeout_arg = JSON_Schema.Arg.default("timeout_ms", "Max. wait.",
       PIDE_AI_Tool_Schema.ms_format(0), Time.zero)
-    val progress_delay_arg = PIDE_AI_Tool_Schema.progress_delay_arg(progress_delay_option)
+    val progress_delay_arg = PIDE_AI_Tool_Schema.progress_delay_arg(
+      s"$progress_delay_option of first selected session")
 
     val args: List[JSON_Schema.Arg[?]] =
       List(show_cmds_running_arg, show_terminated_slow_arg, PIDE_AI_Tool_Schema.long_running_arg,
@@ -107,8 +108,8 @@ object Get_Session_State_Tool {
 class Get_Session_State_Tool extends PIDE_AI_Tool("get_session_state")
 with PIDE_AI_Tool.Read_Only {
   def description: String =
-    "State of running sessions, information for their theories " +
-    "(status, commands being processed,...), resource statistics,..."
+    "State of running sessions and their theories " +
+    "(failures, commands being processed,...), resource statistics,..."
 
   val filter_thys_arg = JSON_Schema.Arg.default(
     "filter_thys",

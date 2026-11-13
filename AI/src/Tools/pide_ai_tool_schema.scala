@@ -48,8 +48,8 @@ object PIDE_AI_Tool_Schema {
     s"${PIDE_AI_Tool_Util.Stop_On.any_failed} = first failure or all terminated.",
     JSON_Schema.Format.enumeration(PIDE_AI_Tool_Util.Stop_On.values),
     PIDE_AI_Tool_Util.Stop_On.any_failed)
-  def progress_delay_arg(option: String): JSON_Schema.Arg[Option[Time]] =
-    JSON_Schema.Arg.optional("progress_delay_ms", s"Between reports. Default: $option.",
+  def progress_delay_arg(default: String): JSON_Schema.Arg[Option[Time]] =
+    JSON_Schema.Arg.optional("progress_delay_ms", s"Between reports. Default: $default.",
       ms_format(0))
 
   def show_thy_statuses_arg(
