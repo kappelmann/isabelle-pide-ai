@@ -23,7 +23,7 @@ ask your agent for help and point it to this README.
 
 PIDE AI releases are aligned with Isabelle releases.
 
-- Every supported Isabelle release has a branch of this repository named after it (e.g. `Isabelle2025-2`). Use the branch matching your Isabelle release.
+- Every supported Isabelle release has a branch of this repository named after it (e.g. `Isabelle2026`). Use the branch matching your Isabelle release.
 - Use branch `main` for PIDE AI's development version, which possibly requires a development version of Isabelle, documented in [ISABELLE\_VERSION](./ISABELLE_VERSION).
 
 ## Usage Notes
@@ -265,7 +265,7 @@ supported by the AI for Math Fund by Renaissance Philanthropy.
 
 Cite the [preprint](https://hal.science/hal-05748384): 
 ```
-@misc{pide_mcp,
+@misc{pide_ai,
   title = {{PIDE MCP}: Connecting {AI} Agents to {Isabelle}},
   author = {Kappelmann, Kevin},
   year = {2026},
@@ -279,21 +279,21 @@ Cite the [preprint](https://hal.science/hal-05748384):
 Cite PIDE AI code release:
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21218654.svg)](https://doi.org/10.5281/zenodo.21218654)
 ```
-@software{pide_mcp_code_release,
+@software{pide_ai_code_release,
   author     = {Kappelmann, Kevin},
-  title      = {{Isabelle PIDE MCP}},
+  title      = {{Isabelle PIDE AI}},
   license    = {LGPL-3.0},
   year       = 2026,
   publisher  = {Zenodo},
-  version    = {2025-2-updated},
-  doi        = {10.5281/zenodo.22726529},
-  url        = {https://doi.org/10.5281/zenodo.22726529}
+  version    = {2026},
+  doi        = {10.5281/zenodo.21218654},
+  url        = {https://doi.org/10.5281/zenodo.21218654}
 }
 ```
 
 Cite this repository:
 ```
-@software{pide_mcp_code,
+@software{pide_ai_code,
   author  = {Kappelmann, Kevin},
   title   = {{Isabelle PIDE AI}},
   license = {LGPL-3.0},
