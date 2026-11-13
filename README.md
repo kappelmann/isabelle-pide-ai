@@ -277,7 +277,7 @@ Cite the [preprint](https://hal.science/hal-05748384):
 ```
 
 Cite PIDE AI code release:
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21218654.svg)](https://doi.org/10.5281/zenodo.21218654)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21218654.svg)](https://doi.org/10.5281/zenodo.24203948)
 ```
 @software{pide_ai_code_release,
   author     = {Kappelmann, Kevin},
@@ -286,8 +286,8 @@ Cite PIDE AI code release:
   year       = 2026,
   publisher  = {Zenodo},
   version    = {2026},
-  doi        = {10.5281/zenodo.21218654},
-  url        = {https://doi.org/10.5281/zenodo.21218654}
+  doi        = {10.5281/zenodo.24203948},
+  url        = {https://doi.org/10.5281/zenodo.24203948}
 }
 ```
 
