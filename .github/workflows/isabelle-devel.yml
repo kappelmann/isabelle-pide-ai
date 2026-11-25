@@ -23,6 +23,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y mercurial
+          hg clone -u tip https://isabelle.sketis.net/repos/isabelle isabelle ||
           hg clone -u tip https://isabelle.in.tum.de/repos/isabelle isabelle
 
       - name: Compile PIDE AI, MCP, and tool extensions
